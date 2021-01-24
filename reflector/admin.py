@@ -11,14 +11,10 @@ class DatabaseForm(forms.ModelForm):
         widgets = {
             'config': AceWidget(mode='json')
         }
-        fields = ['handle', 'description', 'config']
+        fields = ['handle', 'description', 'source', 'config']
 
 class DatabaseAdmin(admin.ModelAdmin):
     form = DatabaseForm
-    def get_form(self, request, obj=None, **kwargs):
-        if not obj:
-            kwargs['exclude'] = ['connection_verified']
-        return super(DatabaseAdmin, self).get_form(request, obj, **kwargs)
     def get_readonly_fields(self, request, obj=None):
         if obj:
             return ['source']

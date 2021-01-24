@@ -1,4 +1,7 @@
 from django.db import models
+from django.core.exceptions import ValidationError
+from sqlalchemy import create_engine
+import urllib.parse
 import json
 
 # Create your models here.
@@ -57,6 +60,20 @@ class Database(models.Model):
     source = models.IntegerField(choices=datasources.touple, help_text='Select what kind of SQL database this is')
     config = models.CharField(max_length=1000, help_text='Set connection information and credentials')
     description = models.CharField(max_length=200, help_text='Describe what this database is all about')
-    connection_verified = models.BooleanField(default=False)
     def __str__(self):
         return self.handle
+    def mount(self):
+        config = json.loads(self.config)
+        connectionStr = datasources.__list__[self.source]['name'].lower() + '://'
+        connectionStr += urllib.parse.quote_plus(config['user']) + ":" + urllib.parse.quote_plus(config['password']) + "@"
+        connectionStr += config['host']
+        if "port" in config:
+            connectionStr += ":"
+            connectionStr += str(config["port"])
+        connectionStr += "/" + config["dbname"]
+        return create_engine(connectionStr, echo = False)
+    def clean(self):
+        try:
+            self.mount().connect()
+        except Exception as e:
+            raise ValidationError('Failed to connect to database: {0}'.format(e))
