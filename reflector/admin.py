@@ -15,6 +15,7 @@ class DatabaseForm(forms.ModelForm):
 
 class DatabaseAdmin(admin.ModelAdmin):
     form = DatabaseForm
+    list_display = ['handle', 'description', 'source']
     def get_readonly_fields(self, request, obj=None):
         if obj:
             return ['source']
