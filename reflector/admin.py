@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django import forms
-from .models import Database
+from .models import Database, BroadcastingTable
 from django_ace import AceWidget
 
 # Register your models here.
@@ -22,4 +22,14 @@ class DatabaseAdmin(admin.ModelAdmin):
         else:
             return []
 
+class BroadcastingTableAdmin(admin.ModelAdmin):
+    exclude = ['fk_name']
+    list_display = []
+    def get_readonly_fields(self, request, obj=None):
+        if obj:
+            return ['source_database', 'source_table']
+        else:
+            return []
+
 admin.site.register(Database, DatabaseAdmin)
+admin.site.register(BroadcastingTable, BroadcastingTableAdmin)
