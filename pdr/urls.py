@@ -19,6 +19,6 @@ from reflector import views
 
 urlpatterns = [
     path('', admin.site.urls),
-    path('api/connection/config', views.connection_config),
-    path('api/connection/<slug:connectionIdOrHandle>/tables', views.connection_tables)
+    path('api/db/config', views.db_config),
+    path('api/db/<slug:dbIdOrHandle>/tables', views.db_tables)
 ]
