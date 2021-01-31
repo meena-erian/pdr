@@ -8,7 +8,7 @@ def make_query(query_name, *args):
 
 def make_script(script_name, *args):
     import os
-    import datasource
+    import reflector
     file_path = "{0}\\js\\{1}.js".format(os.path.dirname(reflector.__file__),script_name)
     f = open(file_path)
     d = f.read()
