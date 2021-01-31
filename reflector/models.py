@@ -1,6 +1,6 @@
 from django.db import models
 from django.core.exceptions import ValidationError
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect
 import urllib.parse
 import json
 
@@ -104,7 +104,18 @@ class BroadcastingTable(models.Model):
     def clean(self):
         if not hasattr(self, 'source_database'):
             raise ValidationError('Please select source database')
+        if not hasattr(self, 'source_table') or len(self.source_table) < 3:
+            raise ValidationError('Please select source table')
         ### Check if selected table exists in selected database. if not raise ValidationError
+        db = self.source_database.mount()
+        dbInfo = inspect(db)
+        schema, table = self.source_table.split('.')
+        try:
+            tableInfo = dbInfo.get_columns(table, schema)
+        except Exception as e:
+            raise ValidationError('Table not found: {0}'.format(e))
+        if len(tableInfo) < 1:
+            raise ValidationError('Table not found')
         ### Install event listeners to the table
     def delete(self):
         ### try to remove event listeners from the databases table. If failed, raise ValidationError
