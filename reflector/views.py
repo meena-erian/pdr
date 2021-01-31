@@ -12,6 +12,9 @@ def connection_config(request):
 
 @staff_member_required
 def connection_tables(request, connectionIdOrHandle):
-    if isinstance(connectionIdOrHandle, str):
-        return HttpResponse(json.dumps(Database.objects.get(pk=connectionIdOrHandle).tables(), indent = 2), content_type="application/json")
-    return  HttpResponse(json.dumps(Database.objects.get(handle=connectionIdOrHandle).tables(), indent = 2), content_type="application/json")
+    try:
+        if connectionIdOrHandle.isnumeric():
+            return HttpResponse(json.dumps(Database.objects.get(pk=connectionIdOrHandle).tables(), indent = 2), content_type="application/json")
+        return  HttpResponse(json.dumps(Database.objects.get(handle=connectionIdOrHandle).tables(), indent = 2), content_type="application/json")
+    except:
+        return HttpResponse(json.dumps([]), content_type="application/json")
