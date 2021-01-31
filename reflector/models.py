@@ -72,6 +72,14 @@ class Database(models.Model):
             connectionStr += str(config["port"])
         connectionStr += "/" + config["dbname"]
         return create_engine(connectionStr, echo = False)
+    def tables(self):
+        from .methods import make_query
+        engine = self.mount().connect()
+        results = []
+        ret = engine.execute(make_query('list_tables'))
+        for record in ret:
+            results.append(record[0])
+        return results
     def clean(self):
         try:
             self.mount().connect()
