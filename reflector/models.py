@@ -18,6 +18,7 @@ class datasources:
     __list__ = [
         {
             "name" : "POSTGRESQL",
+            "dialect" : "postgresql",
             "config" : {
                 "dbname": "databasename",
                 "user": "username",
@@ -28,6 +29,7 @@ class datasources:
         },
         {
             "name" : "MSSQL",
+            "dialect" : "mssql+pymssql",
             "config" : {
                 "dbname": "databasename",
                 "user": "username",
@@ -70,7 +72,7 @@ class Database(models.Model):
         return datasources.config()
     def mount(self):
         config = json.loads(self.config)
-        connectionStr = datasources.__list__[self.source]['name'].lower() + '://'
+        connectionStr = datasources.__list__[self.source]['dialect'] + '://'
         connectionStr += urllib.parse.quote_plus(config['user']) + ":" + urllib.parse.quote_plus(config['password']) + "@"
         connectionStr += config['host']
         if "port" in config:
