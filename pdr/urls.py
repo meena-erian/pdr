@@ -15,7 +15,10 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from reflector import views
 
 urlpatterns = [
     path('', admin.site.urls),
+    path('api/connection/config', views.connection_config),
+    path('api/connection/<slug:connectionIdOrHandle>/tables', views.connection_tables)
 ]

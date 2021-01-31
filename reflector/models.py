@@ -48,10 +48,14 @@ class datasources:
         }
     ]
     @classmethod
-    def config(self, sourceid):
+    def config(self, sourceid = -1):
+        if sourceid == -1:
+            return self.__list__
         return self.__list__[sourceid]["config"]
     @classmethod
-    def json(self, sourceid):
+    def json(self, sourceid = -1):
+        if sourceid == -1:
+            return json.dumps(self.__list__, indent=2)
         return json.dumps(self.__list__[sourceid]["config"], indent=2)
 
 
@@ -62,6 +66,8 @@ class Database(models.Model):
     description = models.CharField(max_length=200, help_text='Describe what this database is all about')
     def __str__(self):
         return self.handle
+    def defaults(self):
+        return datasources.config()
     def mount(self):
         config = json.loads(self.config)
         connectionStr = datasources.__list__[self.source]['name'].lower() + '://'
