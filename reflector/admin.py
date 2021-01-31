@@ -38,7 +38,7 @@ class BroadcastingTableForm(forms.ModelForm):
 class BroadcastingTableAdmin(admin.ModelAdmin):
     form = BroadcastingTableForm
     exclude = ['fk_name']
-    list_display = []
+    list_display = ['source_database', 'source_table', 'description']
     def get_readonly_fields(self, request, obj=None):
         if obj:
             return ['source_database', 'source_table']
