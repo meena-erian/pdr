@@ -22,7 +22,7 @@ class DatabaseAdmin(admin.ModelAdmin):
     list_display = ['handle', 'description', 'source']
     def get_readonly_fields(self, request, obj=None):
         if obj:
-            return ['source']
+            return [] #['source']
         else:
             return []
 
@@ -41,7 +41,7 @@ class BroadcastingTableAdmin(admin.ModelAdmin):
     list_display = ['source_database', 'source_table', 'description']
     def get_readonly_fields(self, request, obj=None):
         if obj:
-            return ['source_database', 'source_table']
+            return [] #['source_database', 'source_table']
         else:
             return []
 
