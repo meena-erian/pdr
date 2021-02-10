@@ -35,10 +35,10 @@ class datasources:
             "name" : "MSSQL",
             "dialect" : "mssql+pymssql",
             "config" : {
-                "dbname": "databasename",
-                "user": "username",
-                "password": "password",
-                "host": "hostname or IP address",
+                "dbname": "master",
+                "user": "sa",
+                "password": "",
+                "host": "localhost",
                 "port": 1433
             }
         },
