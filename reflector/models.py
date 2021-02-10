@@ -44,11 +44,12 @@ class datasources:
         },
         {
             "name" : "MYSQL",
+            "dialect" : "mysql+pymsql",
             "config" : {
-                "dbname": "databasename",
-                "user": "username",
+                "dbname": "master",
+                "user": "root",
                 "password": "password",
-                "host": "hostname or IP address",
+                "host": "localhost",
                 "port": 3306
             }
         },
