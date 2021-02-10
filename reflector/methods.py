@@ -9,7 +9,7 @@ def make_query(query_name, *args):
 def exec_query(engine, query_name, *args):
     query = make_query(query_name, *args)
     query = query.split('\n\n\n')
-    with engine.connect() as dbconnection:
+    with engine.connect().execution_options(autocommit=True) as dbconnection:
         for statment in query:
             dbconnection.execute(statment)
 
