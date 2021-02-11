@@ -44,7 +44,7 @@ class datasources:
         },
         {
             "name" : "MYSQL",
-            "dialect" : "mysql+pymsql",
+            "dialect" : "mysql+mysqldb",
             "config" : {
                 "dbname": "master",
                 "user": "root",
@@ -137,7 +137,7 @@ class BroadcastingTable(models.Model):
         pdr_event = Table(
             pdr_table_name, meta,
             Column('id', Integer, primary_key = True, autoincrement = True),
-            Column('c_action', String),
+            Column('c_action', String(6)),
             Column('c_record', primaryKey.type),
             Column('c_time', DateTime, default=datetime.utcnow)
         )
