@@ -10,18 +10,20 @@ pdr_prefix = 'pdr_event'
 
 class datasources:
     touple = (
-        (0, "POSTGRESQL"),
-        (1, "MSSQL"),
-        (2, "MYSQL"),
-        (3, "FIREBIRD")
+        (0, "PostgreSQL"),
+        (1, "Microsoft SQL"),
+        (2, "MySQL/MariaDB"),
+        (3, "SQLite"),
+        (4, "FireBird")
     )
     POSTGRESQL  = 0
     MSSQL       = 1
     MYSQL       = 2
-    FIREBIRD    = 3
+    SQLIGHT     = 3
+    FIREBIRD    = 4
     __list__ = [
         {
-            "name" : "POSTGRESQL",
+            "name" : "PostgreSQL",
             "dialect" : "postgresql",
             "config" : {
                 "dbname": "databasename",
@@ -32,7 +34,7 @@ class datasources:
             }
         },
         {
-            "name" : "MSSQL",
+            "name" : "Microsoft SQL",
             "dialect" : "mssql+pymssql",
             "config" : {
                 "dbname": "master",
@@ -43,7 +45,7 @@ class datasources:
             }
         },
         {
-            "name" : "MYSQL",
+            "name" : "MySQL",
             "dialect" : "mysql+mysqldb",
             "config" : {
                 "dbname": "master",
@@ -54,7 +56,14 @@ class datasources:
             }
         },
         {
-            "name" : "FIREBIRD",
+            "name" : "SQLite",
+            "dialect" : "sqlite+pysqlite",
+            "config" : {
+                "dbfile" : "path/to/database.db"
+            }
+        },
+        {
+            "name" : "FireBird",
             "dialect" : "firebird+kinterbasdb",
             "config" : {
                 "dbname": "databasename",
@@ -64,7 +73,7 @@ class datasources:
                 "path": "C:/projects/databases/myproject.fdb",
                 "port": 3050
             }
-        }
+        },
     ]
     @classmethod
     def config(self, sourceid = -1):
@@ -90,18 +99,24 @@ class Database(models.Model):
     def mount(self):
         config = json.loads(self.config)
         connectionStr = datasources.__list__[self.source]['dialect'] + '://'
-        connectionStr += urllib.parse.quote_plus(config['user']) + ":" + urllib.parse.quote_plus(config['password']) + "@"
-        connectionStr += config['host']
-        if "port" in config:
-            connectionStr += ":"
-            connectionStr += str(config["port"])
-        connectionStr += "/" + config["dbname"]
+        if 'dbfile' in config:
+            connectionStr += '/' + config['dbfile']
+        else:
+            connectionStr += urllib.parse.quote_plus(config['user']) + ":" + urllib.parse.quote_plus(config['password']) + "@"
+            connectionStr += config['host']
+            if "port" in config:
+                connectionStr += ":"
+                connectionStr += str(config["port"])
+            connectionStr += "/" + config["dbname"]
         return create_engine(connectionStr, echo = False)
     def tables(self):
         from .methods import make_query
         engine = self.mount().connect()
         results = []
-        ret = engine.execute(make_query('list_tables'))
+        if self.source == datasources.SQLIGHT:
+            ret = engine.execute(make_query(datasources.__list__[self.source]['dialect'] + '/list_tables'))
+        else:
+            ret = engine.execute(make_query('list_tables'))
         for record in ret:
             results.append(record[0])
         return results
@@ -126,7 +141,14 @@ class BroadcastingTable(models.Model):
             raise ValidationError('Please select source table')
         ### Check if selected table exists in selected database. if not raise ValidationError
         db = self.source_database.mount()
-        schema, table = self.source_table.split('.')
+        table_path = self.source_table.split('.')
+        if len(table_path) == 1:
+            schema = None
+            table = table_path[0]
+        elif len(table_path) == 2:
+            schema, table = table_path
+        else:
+            raise ValidationError('Invalid table path')
         try:
             table_obj = Table(table, MetaData(), autoload=True, autoload_with=db, schema=schema)
         except Exception as e:
@@ -152,7 +174,12 @@ class BroadcastingTable(models.Model):
         )
     def delete(self):
         from .methods import exec_query
-        schema, table = self.source_table.split('.')
+        table_path = self.source_table.split('.')
+        if len(table_path) == 1:
+            schema = None
+            table = table_path[0]
+        elif len(table_path) == 2:
+            schema, table = table_path
         db = self.source_database.mount()
         ### try to remove event listeners from the databases table. If failed, raise ValidationError
         exec_query(
