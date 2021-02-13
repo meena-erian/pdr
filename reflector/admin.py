@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django import forms
-from .models import Database, BroadcastingTable
+from .models import Database, BroadcastingTable, Reflection
 from django_ace import AceWidget
 from .methods import make_script
 
@@ -45,5 +45,19 @@ class BroadcastingTableAdmin(admin.ModelAdmin):
         else:
             return []
 
+class ReflectionForm(forms.ModelForm):
+    class Meta:
+        model = Reflection
+        widgets = {
+            'record_reflection': AceWidget(mode='json'),
+            'source_fields': AceWidget(mode='json', readonly=True)
+        }
+        fields = ('description', 'source_table', 'destination_database', 'destination_table', 'source_fields', 'record_reflection')
+
+class ReflectionAdmin(admin.ModelAdmin):
+    exclude = ['last_commit']
+    form = ReflectionForm
+
 admin.site.register(Database, DatabaseAdmin)
 admin.site.register(BroadcastingTable, BroadcastingTableAdmin)
+admin.site.register(Reflection, ReflectionAdmin)
