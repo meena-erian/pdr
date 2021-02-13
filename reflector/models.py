@@ -190,3 +190,14 @@ class BroadcastingTable(models.Model):
             table
         )
         super(BroadcastingTable, self).delete()
+
+class Reflection(models.Model):
+    description = models.CharField(max_length=500)
+    source_table = models.ForeignKey(BroadcastingTable, on_delete=models.CASCADE)       # The source broadcasting table
+    destination_database = models.ForeignKey(Database, on_delete=models.CASCADE)        # The destination datastorage
+    destination_table = models.CharField(max_length=500)
+    last_commit = models.IntegerField(help_text='id of last pdr_event executed', blank=True, null=True)
+    source_fields = models.CharField(help_text='json representation of the structure of the source table (read only)', max_length=1000)
+    record_reflection = models.CharField(help_text='json configuration that represents the translation from source data to destination structure', max_length=1000)
+    def __str__(self):
+        return '{0}-->{1}.{2} : {3}'.format(self.source_table,self.destination_database, self.destination_table, self.description)
