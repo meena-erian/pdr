@@ -94,8 +94,6 @@ class Database(models.Model):
     description = models.CharField(max_length=200, help_text='Describe what this database is all about')
     def __str__(self):
         return self.handle
-    def defaults(self):
-        return datasources.config()
     def mount(self):
         config = json.loads(self.config)
         connectionStr = datasources.__list__[self.source]['dialect'] + '://'
@@ -120,6 +118,14 @@ class Database(models.Model):
         for record in ret:
             results.append(record[0])
         return results
+    def meta(self, schema = None):
+        db = self.mount()
+        return MetaData(bind=db, reflect=True, schema=schema)
+    def get_table(self, table, schema = None):
+        meta = self.meta(schema)
+        if schema != None:
+            table = schema + '.' + table
+        return meta.tables[table]
     def clean(self):
         try:
             self.mount().connect()

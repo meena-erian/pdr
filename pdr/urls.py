@@ -20,5 +20,6 @@ from reflector import views
 urlpatterns = [
     path('', admin.site.urls),
     path('api/db/config', views.db_config),
-    path('api/db/<slug:dbIdOrHandle>/tables', views.db_tables)
+    path('api/db/<slug:dbIdOrHandle>/tables', views.db_tables),
+    path('api/broadcaster/<slug:btID>/fields', views.table_fields)
 ]
