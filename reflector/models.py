@@ -8,6 +8,31 @@ import json
 # Create your models here.
 pdr_prefix = 'pdr_event'
 
+
+def typeFullName(o):
+  module = o.__class__.__module__
+  if module is None or module == str.__class__.__module__:
+    return o.__class__.__name__  # Avoid reporting __builtin__
+  else:
+    return module + '.' + o.__class__.__name__
+
+
+def ColTypeToStr(Type):
+    instanceClassName = typeFullName(Type)
+    mainParent, path = instanceClassName.split('.', 1)
+    if mainParent != 'sqlalchemy':
+        raise Exception('Invalid type for SQL')
+    return path
+
+def StrToColType(TypePath):
+    import sqlalchemy
+    pathentries = TypePath.split('.')
+    currentEntry = sqlalchemy
+    for entry in pathentries:
+        currentEntry = currentEntry.__dict__[entry]
+    return currentEntry
+
+
 class datasources:
     touple = (
         (0, "PostgreSQL"),
@@ -137,6 +162,21 @@ class BroadcastingTable(models.Model):
     source_table = models.CharField(max_length=200)
     description = models.CharField(max_length=500, blank=True)
     fk_name = models.CharField(max_length=500, blank=True, null=True)
+    def get_table(self):
+        path = self.source_table.split('.')
+        path.reverse()
+        return self.source_database.get_table(*path)
+    def get_structure(self):
+        ret = {"columns": {}}
+        table = self.get_table()
+        for column in table.columns:
+            if hasattr(column, 'type'):
+                c_type = ColTypeToStr(column.type)
+            else:
+                c_type = None
+            ret['columns'][column.name] = c_type
+        ret['key'] = table.primary_key.columns.values()[0].name
+        return ret
     def __str__(self):
         return self.source_database.handle + '.' + self.source_table
     def clean(self):

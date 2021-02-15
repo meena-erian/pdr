@@ -25,15 +25,5 @@ def table_fields(request, btID):
         bt = BroadcastingTable.objects.get(pk=btID)
     except:
         return HttpResponse(json.dumps([]), content_type="application/json")
-    table_args = bt.source_table.split('.')
-    table_args.reverse()
-    table = bt.source_database.get_table(*table_args)
-    ret = {"columns": {}}
-    for column in table.columns:
-        if hasattr(column, 'type'):
-            c_type = column.type.__str__()
-        else:
-            c_type = None
-        ret['columns'][column.name] = c_type
-    ret['key'] = table.primary_key.columns.values()[0].name
+    ret = bt.get_structure()
     return HttpResponse(json.dumps(ret, indent = 2), content_type="application/json") 
