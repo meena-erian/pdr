@@ -305,6 +305,16 @@ class Reflection(models.Model):
         record_reflection = json.loads(self.record_reflection)
         params = {destination_pk.name : id}
         destination_dbc.execute(text(record_reflection['delete_query']), **params)
+    def dump(self):
+        source_dbe = self.source_table.source_database.mount()
+        source_dbc = source_dbe.connect()
+        source_table = self.source_table.get_table()
+        source_pk = source_table.primary_key.columns.values()[0]
+        ret = source_dbc.execute(source_table.select().with_only_columns([source_pk]))
+        for rec in ret:
+            self.upsert(id)
+    def reflect(self):
+        None
     def __str__(self):
         return '{0}-->{1}.{2} : {3}'.format(self.source_table,self.destination_database, self.destination_table, self.description)
     def clean(self):
@@ -365,3 +375,4 @@ class Reflection(models.Model):
                 meta.create_all(ddb)
             except Exception as e:
                 raise ValidationError('Failed to create table: {0}'.format(e))
+        self.dump()
