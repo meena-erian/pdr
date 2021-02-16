@@ -8,6 +8,15 @@ import json
 # Create your models here.
 pdr_prefix = 'pdr_event'
 
+def add_column(engine, table_name, column):
+    column_name = column.compile(dialect=engine.dialect)
+    column_type = column.type.compile(engine.dialect)
+    engine.execute('ALTER TABLE %s ADD COLUMN %s %s NULL' % (table_name, column_name, column_type))
+
+def get_pk(table):
+    from sqlalchemy.inspection import inspect
+    ins = inspect(table)
+    return ins.identity
 
 def typeFullName(o):
   module = o.__class__.__module__
@@ -22,6 +31,8 @@ def ColTypeToStr(Type):
     mainParent, path = instanceClassName.split('.', 1)
     if mainParent != 'sqlalchemy':
         raise Exception('Invalid type for SQL')
+    if hasattr(Type, 'length'):
+        path += '({0})'.format(Type.length)
     return path
 
 def StrToColType(TypePath):
@@ -29,7 +40,12 @@ def StrToColType(TypePath):
     pathentries = TypePath.split('.')
     currentEntry = sqlalchemy
     for entry in pathentries:
-        currentEntry = currentEntry.__dict__[entry]
+        if '(' in entry:
+            className, varLength = entry.split('(', 1)
+            varLength = int(varLength.strip(' ()'))
+            currentEntry = currentEntry.__dict__[className](varLength)
+        else:
+            currentEntry = currentEntry.__dict__[entry]
     return currentEntry
 
 
@@ -150,7 +166,10 @@ class Database(models.Model):
         meta = self.meta(schema)
         if schema != None:
             table = schema + '.' + table
-        return meta.tables[table]
+        if table in meta.tables:
+            return meta.tables[table]
+        else:
+            return None
     def clean(self):
         try:
             self.mount().connect()
@@ -247,3 +266,61 @@ class Reflection(models.Model):
     record_reflection = models.CharField(help_text='json configuration that represents the translation from source data to destination structure', max_length=1000)
     def __str__(self):
         return '{0}-->{1}.{2} : {3}'.format(self.source_table,self.destination_database, self.destination_table, self.description)
+    def clean(self):
+        destTablePath = self.destination_table.split('.')
+        destTablePath.reverse()
+        if len(destTablePath) == 1:
+            table = destTablePath[0]
+            schema = None
+        elif len(destTablePath) == 2:
+            table = destTablePath[0]
+            schema = destTablePath[1]
+        else:
+            raise ValidationError('Invalid table path: {0}'.format(destTablePath))
+        #source_fields = json.loads(self.source_fields)
+        record_reflection = json.loads(self.record_reflection)
+        ddb = self.destination_database.mount()
+        destinationTable = self.destination_database.get_table(table, schema)
+        if destinationTable != None:
+            # Table already exists, check its compatiblity
+            pk_name = destinationTable.primary_key.columns.values()[0].name
+            pk_type = ColTypeToStr(destinationTable.primary_key.columns.values()[0].type)
+            if record_reflection['key'] != pk_name:
+                raise ValidationError(
+                    'Table \'{0}\' already exists but its primary key is \'{1}\' rather than \'{2}\''
+                    .format(self.destination_table, pk_name, record_reflection['key'])
+                )
+            if record_reflection['columns'][record_reflection['key']] != pk_type:
+                raise ValidationError(
+                    'Table \'{0}\' already exists but primary key \'{1}\' is of type \'{2}\' rather than \'{3}\''
+                    .format(self.destination_table, pk_name, pk_type, record_reflection['columns'][record_reflection['key']])
+                )
+            for needed_column in record_reflection['columns']:
+                c_type = record_reflection['columns'][needed_column]
+                if needed_column not in destinationTable.columns:
+                    ColumnObj = Column(
+                        needed_column, 
+                        StrToColType(c_type),
+                        nullable = True
+                    )
+                    add_column(ddb, self.destination_table, ColumnObj)
+                    print('<<<<<<<<<<<<<<<<<Creating column \'{0}\''.format(needed_column))
+            # Check PK name and type
+        else:
+            # Table not defined, create table
+            try:
+                meta = MetaData()
+                tablecolumns = []   
+                for col in record_reflection['columns']:
+                    ispk = col == record_reflection['key']
+                    tablecolumns.append(
+                        Column(col, StrToColType(record_reflection['columns'][col]), nullable = not ispk, primary_key = ispk)
+                    )
+                newTable = Table(
+                    table, meta,
+                    *tablecolumns,
+                    schema=schema
+                )
+                meta.create_all(ddb)
+            except Exception as e:
+                raise ValidationError('Failed to create table: {0}'.format(e))
