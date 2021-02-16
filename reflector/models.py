@@ -45,7 +45,7 @@ def StrToColType(TypePath):
             varLength = int(varLength.strip(' ()'))
             currentEntry = currentEntry.__dict__[className](varLength)
         else:
-            currentEntry = currentEntry.__dict__[entry]
+            currentEntry = currentEntry.__dict__[entry] 
     return currentEntry
 
 
@@ -185,6 +185,12 @@ class BroadcastingTable(models.Model):
         path = self.source_table.split('.')
         path.reverse()
         return self.source_database.get_table(*path)
+    def get_pdr_table(self):
+        table_path = self.source_table.split('.')
+        if len(table_path) == 1:
+            table_path.insert(0, 'None')
+        pdr_table_name = '{0}_o_{1}_o_{2}'.format(pdr_prefix, *table_path)
+        return self.source_database.get_table(pdr_table_name)
     def get_structure(self):
         ret = {"columns": {}}
         table = self.get_table()
@@ -310,11 +316,38 @@ class Reflection(models.Model):
         source_dbc = source_dbe.connect()
         source_table = self.source_table.get_table()
         source_pk = source_table.primary_key.columns.values()[0]
+        # Check if we have any pdr events for this broadcaster and update "last_commit"
+        #
+        #
+        #
         ret = source_dbc.execute(source_table.select().with_only_columns([source_pk]))
         for rec in ret:
-            self.upsert(id)
+            print(rec[0])
+            self.upsert(rec[0])
     def reflect(self):
-        None
+        source_dbc = self.source_table.source_database.mount().connect()
+        # Read BroadcastingTable's latest pdr_events
+        pdr_table = self.source_table.get_pdr_table()
+        stmt = pdr_table.select()
+        if self.last_commit:
+            stmt = stmt.where(pdr_table.c.id > self.last_commit)
+        print('<<<<<<<<<<<<<Reflection select :')
+        print(str(stmt))
+        ret = source_dbc.execute(stmt)
+        for pdr_event in ret:
+            pdr_event_obj = {}
+            index = 0
+            for c in pdr_table.c:
+                pdr_event_obj[c.name] = pdr_event[index]
+                index += 1
+            if pdr_event_obj['c_action'] in ['INSERT', 'UPDATE']:
+                print('<<<<<<<<<<<UPSERT: {0}'.format(pdr_event_obj['c_record']))
+                self.upsert(pdr_event_obj['c_record'])
+            if pdr_event_obj['c_action'] == 'DELETE':
+                print('<<<<<<<<<<<DELETE: {0}'.format(pdr_event_obj['c_record']))
+                self.delete(pdr_event_obj['c_record'])
+            self.last_commit = pdr_event_obj['id']
+        self.save()
     def __str__(self):
         return '{0}-->{1}.{2} : {3}'.format(self.source_table,self.destination_database, self.destination_table, self.description)
     def clean(self):
@@ -355,7 +388,6 @@ class Reflection(models.Model):
                         nullable = True
                     )
                     add_column(ddb, self.destination_table, ColumnObj)
-                    print('<<<<<<<<<<<<<<<<<Creating column \'{0}\''.format(needed_column))
             # Check PK name and type
         else:
             # Table not defined, create table
