@@ -290,11 +290,11 @@ class Reflection(models.Model):
                     'Table \'{0}\' already exists but its primary key is \'{1}\' rather than \'{2}\''
                     .format(self.destination_table, pk_name, record_reflection['key'])
                 )
-            if record_reflection['columns'][record_reflection['key']] != pk_type:
-                raise ValidationError(
-                    'Table \'{0}\' already exists but primary key \'{1}\' is of type \'{2}\' rather than \'{3}\''
-                    .format(self.destination_table, pk_name, pk_type, record_reflection['columns'][record_reflection['key']])
-                )
+            #if record_reflection['columns'][record_reflection['key']] != pk_type:
+            #    raise ValidationError(
+            #        'Table \'{0}\' already exists but primary key \'{1}\' is of type \'{2}\' rather than \'{3}\''
+            #        .format(self.destination_table, pk_name, pk_type, record_reflection['columns'][record_reflection['key']])
+            #    )
             for needed_column in record_reflection['columns']:
                 c_type = record_reflection['columns'][needed_column]
                 if needed_column not in destinationTable.columns:
