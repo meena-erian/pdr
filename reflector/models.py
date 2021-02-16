@@ -264,6 +264,47 @@ class Reflection(models.Model):
     last_commit = models.IntegerField(help_text='id of last pdr_event executed', blank=True, null=True)
     source_fields = models.CharField(help_text='json representation of the structure of the source table (read only)', max_length=1000)
     record_reflection = models.CharField(help_text='json configuration that represents the translation from source data to destination structure', max_length=1000)
+    def upsert(self, id):
+        source_dbe = self.source_table.source_database.mount()
+        destination_dbe = self.destination_database.mount()
+        source_dbc = source_dbe.connect()
+        destination_dbc = destination_dbe.connect()
+        source_table = self.source_table.get_table()
+        dest_table_path = self.destination_table.split('.')
+        dest_table_path.reverse()
+        destination_table = self.destination_database.get_table(*dest_table_path)
+        destination_pk = destination_table.primary_key.columns.values()[0]
+        source_pk = source_table.primary_key.columns.values()[0]
+        record_reflection = json.loads(self.record_reflection)
+        ret = source_dbc.execute(
+            source_table.select().where(source_pk == id)
+        )
+        for rec in ret:
+            recDict = {}
+            insex = 0
+            for col in source_table.columns:
+                recDict[col.name] = rec[insex]
+                insex += 1
+            # Check if the record already exists in destination db
+            already_exists = destination_dbc.execute(
+                destination_table.select().where(destination_pk == id)
+            ).fetchone()
+            # Insert or update record
+            if already_exists:
+                query = record_reflection['update_query']
+            else:
+                query = record_reflection['insert_query']
+            destination_dbc.execute(text(query), **recDict)
+    def delete(self, id):
+        destination_dbe = self.destination_database.mount()
+        destination_dbc = destination_dbe.connect()
+        dest_table_path = self.destination_table.split('.')
+        dest_table_path.reverse()
+        destination_table = self.destination_database.get_table(*dest_table_path)
+        destination_pk = destination_table.primary_key.columns.values()[0]
+        record_reflection = json.loads(self.record_reflection)
+        params = {destination_pk.name : id}
+        destination_dbc.execute(text(record_reflection['delete_query']), **params)
     def __str__(self):
         return '{0}-->{1}.{2} : {3}'.format(self.source_table,self.destination_database, self.destination_table, self.description)
     def clean(self):
