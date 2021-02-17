@@ -4,6 +4,7 @@ from datetime import datetime
 from sqlalchemy import *
 import urllib.parse
 import json
+import threading
 
 # Create your models here.
 pdr_prefix = 'pdr_event'
@@ -341,16 +342,14 @@ class Reflection(models.Model):
         stmt = pdr_table.select()
         if self.last_commit:
             stmt = stmt.where(pdr_table.c.id > self.last_commit)
-        print('<<<<<<<<<<<<<Reflection select :')
-        print(str(stmt))
         ret = source_dbc.execute(stmt)
         for pdr_event in ret:
             pdr_event_obj = recToDict(pdr_event, pdr_table)
             if pdr_event_obj['c_action'] in ['INSERT', 'UPDATE']:
-                print('<<<<<<<<<<<UPSERT: {0}'.format(pdr_event_obj['c_record']))
+                print(self, '<<<<<<<<<<<UPSERT: {0}'.format(pdr_event_obj['c_record']))
                 self.upsert(pdr_event_obj['c_record'])
             if pdr_event_obj['c_action'] == 'DELETE':
-                print('<<<<<<<<<<<DELETE: {0}'.format(pdr_event_obj['c_record']))
+                print(self, '<<<<<<<<<<<DELETE: {0}'.format(pdr_event_obj['c_record']))
                 self.delete(pdr_event_obj['c_record'])
             self.last_commit = pdr_event_obj['id']
         self.save()
@@ -414,3 +413,7 @@ class Reflection(models.Model):
             except Exception as e:
                 raise ValidationError('Failed to create table: {0}'.format(e))
         self.dump()
+    def start(self):
+        WAIT_SECONDS = 3
+        self.reflect()
+        threading.Timer(WAIT_SECONDS, self.start).start()

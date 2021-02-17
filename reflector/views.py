@@ -1,8 +1,9 @@
 #from django.shortcuts import render
 from django.http import HttpResponse
-from .models import Database, BroadcastingTable
+from .models import Database, BroadcastingTable, Reflection
 import json
 from django.contrib.admin.views.decorators import staff_member_required
+import threading
 
 
 # Create your views here.
@@ -27,3 +28,6 @@ def table_fields(request, btID):
         return HttpResponse(json.dumps([]), content_type="application/json")
     ret = bt.get_structure()
     return HttpResponse(json.dumps(ret, indent = 2), content_type="application/json") 
+
+for reflection in Reflection.objects.all():
+    reflection.start()
