@@ -8,6 +8,14 @@ import json
 # Create your models here.
 pdr_prefix = 'pdr_event'
 
+def recToDict(rec, table):
+    index = 0
+    ret = {}
+    for c in table.c:
+        ret[c.name] = rec[index]
+        index += 1
+    return ret
+
 def add_column(engine, table_name, column):
     column_name = column.compile(dialect=engine.dialect)
     column_type = column.type.compile(engine.dialect)
@@ -286,11 +294,7 @@ class Reflection(models.Model):
             source_table.select().where(source_pk == id)
         )
         for rec in ret:
-            recDict = {}
-            insex = 0
-            for col in source_table.columns:
-                recDict[col.name] = rec[insex]
-                insex += 1
+            recDict =recToDict(rec, source_table)
             # Check if the record already exists in destination db
             already_exists = destination_dbc.execute(
                 destination_table.select().where(destination_pk == id)
@@ -315,11 +319,17 @@ class Reflection(models.Model):
         source_dbe = self.source_table.source_database.mount()
         source_dbc = source_dbe.connect()
         source_table = self.source_table.get_table()
+        source_pdr_table = self.source_table.get_pdr_table()
         source_pk = source_table.primary_key.columns.values()[0]
         # Check if we have any pdr events for this broadcaster and update "last_commit"
-        #
-        #
-        #
+        ret = source_dbc.execute(
+            source_pdr_table.select().order_by(desc(source_pdr_table.c.id)).limit(1)
+        ).fetchall()
+        if len(ret):
+            ret = ret[0]
+            ret = recToDict(ret, source_pdr_table)
+            self.last_commit = ret['id']
+            self.save()
         ret = source_dbc.execute(source_table.select().with_only_columns([source_pk]))
         for rec in ret:
             print(rec[0])
@@ -335,11 +345,7 @@ class Reflection(models.Model):
         print(str(stmt))
         ret = source_dbc.execute(stmt)
         for pdr_event in ret:
-            pdr_event_obj = {}
-            index = 0
-            for c in pdr_table.c:
-                pdr_event_obj[c.name] = pdr_event[index]
-                index += 1
+            pdr_event_obj = recToDict(pdr_event, pdr_table)
             if pdr_event_obj['c_action'] in ['INSERT', 'UPDATE']:
                 print('<<<<<<<<<<<UPSERT: {0}'.format(pdr_event_obj['c_record']))
                 self.upsert(pdr_event_obj['c_record'])
