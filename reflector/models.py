@@ -339,10 +339,19 @@ class Reflection(models.Model):
         source_dbc = self.source_table.source_database.mount().connect()
         # Read BroadcastingTable's latest pdr_events
         pdr_table = self.source_table.get_pdr_table()
-        stmt = pdr_table.select()
+        upsert_stmt = pdr_table.select().with_only_columns([
+            func.max(pdr_table.c.id).label('id'),
+            func.max(pdr_table.c.c_action).label('c_action'),
+            pdr_table.c.c_record,
+            func.max(pdr_table.c.c_time).label('c_time')
+        ])
         if self.last_commit:
-            stmt = stmt.where(pdr_table.c.id > self.last_commit)
-        ret = source_dbc.execute(stmt)
+            upsert_stmt = upsert_stmt.where(pdr_table.c.id > self.last_commit)
+        upsert_stmt = upsert_stmt.group_by(pdr_table.c.c_record)
+        upsert_stmt = upsert_stmt.order_by('id')
+        ret = source_dbc.execute(upsert_stmt)
+        if len(ret) > 0:
+            print(len(ret), " Events retrived")
         for pdr_event in ret:
             pdr_event_obj = recToDict(pdr_event, pdr_table)
             if pdr_event_obj['c_action'] in ['INSERT', 'UPDATE']:
