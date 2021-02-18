@@ -307,6 +307,7 @@ class Reflection(models.Model):
                 query = destination_fields['insert_query']
             destination_dbc.execute(text(query), **recDict)
     def bulk_upsert(self, lst):
+        print(self, 'Saving {0} items'.format(len(lst)))
         destination_dbc = self.destination_database.mount().connect()
         destination_table = self.get_destination_table()
         source_table = self.get_source_table()
@@ -333,7 +334,7 @@ class Reflection(models.Model):
                 text(self.reflection_statment),
                 lst
             )
-        # bind = sql.expression.bindparam
+        print(self, 'Done')
     def bulk_delete(self, lst):
         None
     def delete(self, id):
@@ -347,24 +348,20 @@ class Reflection(models.Model):
         params = {destination_pk.name : id}
         destination_dbc.execute(text(destination_fields['delete_query']), **params)
     def dump(self):
-        source_dbe = self.source_table.source_database.mount()
-        source_dbc = source_dbe.connect()
-        source_table = self.source_table.get_table()
+        source_dbc = self.source_table.source_database.mount().connect()
+        source_table = self.get_source_table()
         source_pdr_table = self.source_table.get_pdr_table()
-        source_pk = source_table.primary_key.columns.values()[0]
         # Check if we have any pdr events for this broadcaster and update "last_commit"
         ret = source_dbc.execute(
             source_pdr_table.select().order_by(desc(source_pdr_table.c.id)).limit(1)
         ).fetchall()
         if len(ret):
-            ret = ret[0]
-            ret = dict(ret)
-            self.last_commit = ret['id']
+            self.last_commit = dict(ret[0])['id']
             self.save()
-        ret = source_dbc.execute(source_table.select().with_only_columns([source_pk]))
-        for rec in ret:
-            print(rec[0])
-            self.upsert(rec[0])
+        # Retrive all existing data and mirror it
+        data = source_dbc.execute(source_table.select()).fetchall()
+        data = [dict(rec) for rec in data]
+        self.bulk_upsert(data)
     def reflect(self):
         source_dbc = self.source_table.source_database.mount().connect()
         # Read BroadcastingTable's latest pdr_events
@@ -394,15 +391,10 @@ class Reflection(models.Model):
         upserts = [retrive_data_record(commit) for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] in ['INSERT', 'UPDATE']]
         deletes = [retrive_data_record(commit) for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] == 'DELETE']
         self.bulk_upsert(upserts)
-            #if pdr_event_obj['{0}_c_action'.format(pdr_prefix)] in ['INSERT', 'UPDATE']:
-            #    print(self, '<<<<<<<<<<<UPSERT: {0}'.format(pdr_event_obj['{0}_c_record'.format(pdr_prefix)]))
-            #    print(data_record)
-            #    self.upsert(pdr_event_obj['{0}_c_record'.format(pdr_prefix)])
-            #if pdr_event_obj['{0}_c_action'.format(pdr_prefix)] == 'DELETE':
-            #    print(self, '<<<<<<<<<<<DELETE: {0}'.format(pdr_event_obj['{0}_c_record'.format(pdr_prefix)]))
-            #    self.delete(pdr_event_obj['{0}_c_record'.format(pdr_prefix)])
-            #self.last_commit = pdr_event_obj['{0}_id'.format(pdr_prefix)]
-        self.save()
+        commit_ids = [c['{0}_id'.format(pdr_prefix)] for c in commits]
+        if len(commit_ids) > 0:
+            self.last_commit = commit_ids[-1]
+            self.save()
     def __str__(self):
         return '{0}-->{1}.{2} : {3}'.format(self.source_table,self.destination_database, self.destination_table, self.description)
     def clean(self):
@@ -429,11 +421,6 @@ class Reflection(models.Model):
                     'Table \'{0}\' already exists but its primary key is \'{1}\' rather than \'{2}\''
                     .format(self.destination_table, pk_name, destination_fields['key'])
                 )
-            #if destination_fields['columns'][destination_fields['key']] != pk_type:
-            #    raise ValidationError(
-            #        'Table \'{0}\' already exists but primary key \'{1}\' is of type \'{2}\' rather than \'{3}\''
-            #        .format(self.destination_table, pk_name, pk_type, destination_fields['columns'][destination_fields['key']])
-            #    )
             for needed_column in destination_fields['columns']:
                 c_type = destination_fields['columns'][needed_column]
                 if needed_column not in destinationTable.columns:
@@ -462,8 +449,8 @@ class Reflection(models.Model):
                 meta.create_all(ddb)
             except Exception as e:
                 raise ValidationError('Failed to create table: {0}'.format(e))
-        #self.dump()
+        self.dump()
     def start(self):
         WAIT_SECONDS = 3
-        #self.reflect()
+        self.reflect()
         threading.Timer(WAIT_SECONDS, self.start).start()

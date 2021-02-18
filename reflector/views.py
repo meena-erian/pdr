@@ -29,5 +29,5 @@ def table_fields(request, btID):
     ret = bt.get_structure()
     return HttpResponse(json.dumps(ret, indent = 2), content_type="application/json") 
 
-#for reflection in Reflection.objects.all():
-#    reflection.start()
+for reflection in Reflection.objects.all():
+    reflection.start()
