@@ -325,22 +325,15 @@ class Reflection(models.Model):
                 missing_records.append(rec)
         # Create missing records
         insert_data = [{destination_table_pk.name : item} for item in missing_records]
-        destination_dbc.execute(destination_table.insert(), insert_data)
         if len(missing_records) > 0:
-            value = {}
-            vars = ''
-            index = 0
-            for c_rec in missing_records:
-                value['v{0}'.format(index)] = c_rec
-                if index > 0:
-                    vars += ','
-                vars += '(:v{0})'.format(index)
-                index += 1
-            stmt = text('INSERT INTO %s(%s) VALUES %s' % (destination_table, destination_table_pk.name, vars)) 
-            destination_dbc.execute(stmt, **value)
+            destination_dbc.execute(destination_table.insert(), insert_data)
         # run update statments for each record
+        if len(targer_ids) > 0:
+            destination_dbc.execute(
+                text(self.reflection_statment),
+                lst
+            )
         # bind = sql.expression.bindparam
-        
     def bulk_delete(self, lst):
         None
     def delete(self, id):
@@ -469,7 +462,7 @@ class Reflection(models.Model):
                 meta.create_all(ddb)
             except Exception as e:
                 raise ValidationError('Failed to create table: {0}'.format(e))
-        self.dump()
+        #self.dump()
     def start(self):
         WAIT_SECONDS = 3
         #self.reflect()
