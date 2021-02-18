@@ -7,6 +7,7 @@ fetch(api).then(function (r) {
         var editors = document.querySelectorAll(".ace_editor");
         var sourceEditor = editors[0].env.editor;
         var destinationEditor = editors[1].env.editor;
+        var statmentEditor = editors[2].env.editor;
         var destination_table = document.querySelector("#id_destination_table").value;
         if(!destination_table.length) destination_table = 'destination_table';
         if (j.columns) {
@@ -19,12 +20,10 @@ fetch(api).then(function (r) {
                 "key" : j.key
             };
             let columns_array = Object.keys(j.columns);
-            reflection_template_destination.insert_query = `insert into ${ destination_table }(${ columns_array.join(', ') })`;
-            reflection_template_destination.insert_query += `\nvalues (${ columns_array.map(c => `:${ c }`).join(', ')});`;
-            reflection_template_destination.update_query = `update ${ destination_table } set ${ columns_array.map(f => `${ f } = :${ f }`).join(', ')} where ${ j.key } = :${ j.key };`;
-            reflection_template_destination.delete_query = `delete from ${ destination_table } where ${ j.key } = :${ j.key };`;
+            var update_query = `UPDATE ${ destination_table } SET ${ columns_array.map(f => `${ f } = :${ f }`).join(', ')} WHERE ${ j.key } = :${ j.key };`;
             sourceEditor.setValue(JSON.stringify(reflection_source, null, 2));
             destinationEditor.setValue(JSON.stringify(reflection_template_destination, null, 2));
+            statmentEditor.setValue(update_query)
         }
         else {
             sourceEditor.setValue("");
