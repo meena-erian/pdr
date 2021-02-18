@@ -2,6 +2,7 @@ from django.db import models
 from django.core.exceptions import ValidationError
 from datetime import datetime
 from sqlalchemy import *
+from sqlalchemy.orm import *
 import urllib.parse
 import json
 import threading
@@ -9,13 +10,6 @@ import threading
 # Create your models here.
 pdr_prefix = 'pdr_event'
 
-def recToDict(rec, table):
-    index = 0
-    ret = {}
-    for c in table.c:
-        ret[c.name] = rec[index]
-        index += 1
-    return ret
 
 def add_column(engine, table_name, column):
     column_name = column.compile(dialect=engine.dialect)
@@ -240,7 +234,7 @@ class BroadcastingTable(models.Model):
             pdr_table_name, meta,
             Column('id', Integer, primary_key = True, autoincrement = True),
             Column('c_action', String(6)),
-            Column('c_record', primaryKey.type),
+            Column('c_record', primaryKey.type, ForeignKey(primaryKey)),
             Column('c_time', DateTime, default=datetime.utcnow)
         )
         meta.create_all(db)
@@ -278,34 +272,77 @@ class Reflection(models.Model):
     destination_table = models.CharField(max_length=500)
     last_commit = models.IntegerField(help_text='id of last pdr_event executed', blank=True, null=True)
     source_fields = models.CharField(help_text='json representation of the structure of the source table (read only)', max_length=1000)
-    record_reflection = models.CharField(help_text='json configuration that represents the translation from source data to destination structure', max_length=1000)
+    destination_fields = models.CharField(help_text='json configuration that represents the translation from source data to destination structure', max_length=1000)
+    reflection_statment = models.CharField(help_text='SQL statment that will be used to input the data into the destination table whenever the source changes', max_length=1000)
+    def get_destination_table(self):
+        dest_table_path = self.destination_table.split('.')
+        dest_table_path.reverse()
+        destination_table = self.destination_database.get_table(*dest_table_path)
+        return destination_table
+    def get_source_table(self):
+        return self.source_table.get_table()
     def upsert(self, id):
         source_dbe = self.source_table.source_database.mount()
         destination_dbe = self.destination_database.mount()
         source_dbc = source_dbe.connect()
         destination_dbc = destination_dbe.connect()
-        source_table = self.source_table.get_table()
-        dest_table_path = self.destination_table.split('.')
-        dest_table_path.reverse()
-        destination_table = self.destination_database.get_table(*dest_table_path)
+        source_table = self.get_source_table()
+        destination_table = self.get_destination_table()
         destination_pk = destination_table.primary_key.columns.values()[0]
         source_pk = source_table.primary_key.columns.values()[0]
-        record_reflection = json.loads(self.record_reflection)
+        destination_fields = json.loads(self.destination_fields)
         ret = source_dbc.execute(
             source_table.select().where(source_pk == id)
         )
         for rec in ret:
-            recDict =recToDict(rec, source_table)
+            recDict = dict(rec)
             # Check if the record already exists in destination db
             already_exists = destination_dbc.execute(
                 destination_table.select().where(destination_pk == id)
             ).fetchone()
             # Insert or update record
             if already_exists:
-                query = record_reflection['update_query']
+                query = destination_fields['update_query']
             else:
-                query = record_reflection['insert_query']
+                query = destination_fields['insert_query']
             destination_dbc.execute(text(query), **recDict)
+    def bulk_upsert(self, lst):
+        destination_dbc = self.destination_database.mount().connect()
+        destination_table = self.get_destination_table()
+        source_table = self.get_source_table()
+        source_table_pk = source_table.primary_key.columns.values()[0]
+        destination_table_pk = destination_table.primary_key.columns.values()[0]
+        # List missing records
+        targer_ids = [rec[source_table_pk.name] for rec in lst]
+        stmt = select([destination_table_pk], destination_table_pk.in_(targer_ids))
+        already_existing_records = [rec[0] for rec in destination_dbc.execute(stmt).fetchall()]
+        index_of_already_existing_records = {}
+        missing_records = []
+        for rec in already_existing_records:
+            index_of_already_existing_records[rec] = 'EXISTS'
+        for rec in targer_ids:
+            if rec not in already_existing_records:
+                missing_records.append(rec)
+        # Create missing records
+        insert_data = [{destination_table_pk.name : item} for item in missing_records]
+        destination_dbc.execute(destination_table.insert(), insert_data)
+        if len(missing_records) > 0:
+            value = {}
+            vars = ''
+            index = 0
+            for c_rec in missing_records:
+                value['v{0}'.format(index)] = c_rec
+                if index > 0:
+                    vars += ','
+                vars += '(:v{0})'.format(index)
+                index += 1
+            stmt = text('INSERT INTO %s(%s) VALUES %s' % (destination_table, destination_table_pk.name, vars)) 
+            destination_dbc.execute(stmt, **value)
+        # run update statments for each record
+        # bind = sql.expression.bindparam
+        
+    def bulk_delete(self, lst):
+        None
     def delete(self, id):
         destination_dbe = self.destination_database.mount()
         destination_dbc = destination_dbe.connect()
@@ -313,9 +350,9 @@ class Reflection(models.Model):
         dest_table_path.reverse()
         destination_table = self.destination_database.get_table(*dest_table_path)
         destination_pk = destination_table.primary_key.columns.values()[0]
-        record_reflection = json.loads(self.record_reflection)
+        destination_fields = json.loads(self.destination_fields)
         params = {destination_pk.name : id}
-        destination_dbc.execute(text(record_reflection['delete_query']), **params)
+        destination_dbc.execute(text(destination_fields['delete_query']), **params)
     def dump(self):
         source_dbe = self.source_table.source_database.mount()
         source_dbc = source_dbe.connect()
@@ -328,7 +365,7 @@ class Reflection(models.Model):
         ).fetchall()
         if len(ret):
             ret = ret[0]
-            ret = recToDict(ret, source_pdr_table)
+            ret = dict(ret)
             self.last_commit = ret['id']
             self.save()
         ret = source_dbc.execute(source_table.select().with_only_columns([source_pk]))
@@ -339,28 +376,39 @@ class Reflection(models.Model):
         source_dbc = self.source_table.source_database.mount().connect()
         # Read BroadcastingTable's latest pdr_events
         pdr_table = self.source_table.get_pdr_table()
-        upsert_stmt = pdr_table.select().with_only_columns([
-            func.max(pdr_table.c.id).label('id'),
-            func.max(pdr_table.c.c_action).label('c_action'),
-            pdr_table.c.c_record,
-            func.max(pdr_table.c.c_time).label('c_time')
+        data_table = self.source_table.get_table()
+        data_table_pk = data_table.primary_key.columns.values()[0]
+        upsert_stmt = pdr_table.join(data_table, pdr_table.c.c_record == data_table_pk).select().with_only_columns([
+            func.max(pdr_table.c.id).label('{0}_id'.format(pdr_prefix)),
+            func.max(pdr_table.c.c_action).label('{0}_c_action'.format(pdr_prefix)),
+            pdr_table.c.c_record.label('{0}_c_record'.format(pdr_prefix)),
+            func.max(pdr_table.c.c_time).label('{0}_c_time'.format(pdr_prefix)),
+            *[func.max(c).label(c.name) for c in data_table.c]
         ])
         if self.last_commit:
             upsert_stmt = upsert_stmt.where(pdr_table.c.id > self.last_commit)
         upsert_stmt = upsert_stmt.group_by(pdr_table.c.c_record)
-        upsert_stmt = upsert_stmt.order_by('id')
+        upsert_stmt = upsert_stmt.order_by('{0}_id'.format(pdr_prefix))
         ret = source_dbc.execute(upsert_stmt)
-        if len(ret) > 0:
-            print(len(ret), " Events retrived")
-        for pdr_event in ret:
-            pdr_event_obj = recToDict(pdr_event, pdr_table)
-            if pdr_event_obj['c_action'] in ['INSERT', 'UPDATE']:
-                print(self, '<<<<<<<<<<<UPSERT: {0}'.format(pdr_event_obj['c_record']))
-                self.upsert(pdr_event_obj['c_record'])
-            if pdr_event_obj['c_action'] == 'DELETE':
-                print(self, '<<<<<<<<<<<DELETE: {0}'.format(pdr_event_obj['c_record']))
-                self.delete(pdr_event_obj['c_record'])
-            self.last_commit = pdr_event_obj['id']
+        def retrive_data_record(commit):
+            data_record = commit.copy()
+            data_record.pop('{0}_id'.format(pdr_prefix))
+            data_record.pop('{0}_c_action'.format(pdr_prefix))
+            data_record.pop('{0}_c_record'.format(pdr_prefix))
+            data_record.pop('{0}_c_time'.format(pdr_prefix))
+            return data_record
+        commits = [dict(commit) for commit in ret.fetchall()]
+        upserts = [retrive_data_record(commit) for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] in ['INSERT', 'UPDATE']]
+        deletes = [retrive_data_record(commit) for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] == 'DELETE']
+        self.bulk_upsert(upserts)
+            #if pdr_event_obj['{0}_c_action'.format(pdr_prefix)] in ['INSERT', 'UPDATE']:
+            #    print(self, '<<<<<<<<<<<UPSERT: {0}'.format(pdr_event_obj['{0}_c_record'.format(pdr_prefix)]))
+            #    print(data_record)
+            #    self.upsert(pdr_event_obj['{0}_c_record'.format(pdr_prefix)])
+            #if pdr_event_obj['{0}_c_action'.format(pdr_prefix)] == 'DELETE':
+            #    print(self, '<<<<<<<<<<<DELETE: {0}'.format(pdr_event_obj['{0}_c_record'.format(pdr_prefix)]))
+            #    self.delete(pdr_event_obj['{0}_c_record'.format(pdr_prefix)])
+            #self.last_commit = pdr_event_obj['{0}_id'.format(pdr_prefix)]
         self.save()
     def __str__(self):
         return '{0}-->{1}.{2} : {3}'.format(self.source_table,self.destination_database, self.destination_table, self.description)
@@ -376,25 +424,25 @@ class Reflection(models.Model):
         else:
             raise ValidationError('Invalid table path: {0}'.format(destTablePath))
         #source_fields = json.loads(self.source_fields)
-        record_reflection = json.loads(self.record_reflection)
+        destination_fields = json.loads(self.destination_fields)
         ddb = self.destination_database.mount()
         destinationTable = self.destination_database.get_table(table, schema)
         if destinationTable != None:
             # Table already exists, check its compatiblity
             pk_name = destinationTable.primary_key.columns.values()[0].name
             pk_type = ColTypeToStr(destinationTable.primary_key.columns.values()[0].type)
-            if record_reflection['key'] != pk_name:
+            if destination_fields['key'] != pk_name:
                 raise ValidationError(
                     'Table \'{0}\' already exists but its primary key is \'{1}\' rather than \'{2}\''
-                    .format(self.destination_table, pk_name, record_reflection['key'])
+                    .format(self.destination_table, pk_name, destination_fields['key'])
                 )
-            #if record_reflection['columns'][record_reflection['key']] != pk_type:
+            #if destination_fields['columns'][destination_fields['key']] != pk_type:
             #    raise ValidationError(
             #        'Table \'{0}\' already exists but primary key \'{1}\' is of type \'{2}\' rather than \'{3}\''
-            #        .format(self.destination_table, pk_name, pk_type, record_reflection['columns'][record_reflection['key']])
+            #        .format(self.destination_table, pk_name, pk_type, destination_fields['columns'][destination_fields['key']])
             #    )
-            for needed_column in record_reflection['columns']:
-                c_type = record_reflection['columns'][needed_column]
+            for needed_column in destination_fields['columns']:
+                c_type = destination_fields['columns'][needed_column]
                 if needed_column not in destinationTable.columns:
                     ColumnObj = Column(
                         needed_column, 
@@ -408,10 +456,10 @@ class Reflection(models.Model):
             try:
                 meta = MetaData()
                 tablecolumns = []   
-                for col in record_reflection['columns']:
-                    ispk = col == record_reflection['key']
+                for col in destination_fields['columns']:
+                    ispk = col == destination_fields['key']
                     tablecolumns.append(
-                        Column(col, StrToColType(record_reflection['columns'][col]), nullable = not ispk, primary_key = ispk)
+                        Column(col, StrToColType(destination_fields['columns'][col]), nullable = not ispk, primary_key = ispk)
                     )
                 newTable = Table(
                     table, meta,
@@ -424,5 +472,5 @@ class Reflection(models.Model):
         self.dump()
     def start(self):
         WAIT_SECONDS = 3
-        self.reflect()
+        #self.reflect()
         threading.Timer(WAIT_SECONDS, self.start).start()

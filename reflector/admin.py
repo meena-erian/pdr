@@ -49,10 +49,11 @@ class ReflectionForm(forms.ModelForm):
     class Meta:
         model = Reflection
         widgets = {
-            'record_reflection': AceWidget(mode='json'),
-            'source_fields': AceWidget(mode='json', readonly=True)
+            'destination_fields': AceWidget(mode='json'),
+            'source_fields': AceWidget(mode='json', readonly=True),
+            'reflection_statment': AceWidget(mode='sql')
         }
-        fields = ('description', 'source_table', 'destination_database', 'destination_table', 'source_fields', 'record_reflection')
+        fields = ('description', 'source_table', 'destination_database', 'destination_table', 'source_fields', 'destination_fields', 'reflection_statment')
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'destination_table' in self.fields:
