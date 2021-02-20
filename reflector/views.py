@@ -30,6 +30,6 @@ def table_fields(request, btID):
 
 try:
     for reflection in Reflection.objects.all():
-        reflection.start()
+        reflection.refresh()
 except Exception as e:
     print('Error starting reflections:', e)
