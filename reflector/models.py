@@ -337,7 +337,7 @@ class Reflection(models.Model):
             )
         print(self, 'Upsert Done')
     def bulk_delete(self, lst):
-        print(self, 'Saving {0} items'.format(len(lst)))
+        print(self, 'Deleting {0} items'.format(len(lst)))
         destination_dbc = self.destination_database.mount().connect()
         destination_table = self.get_destination_table()
         destination_table_pk = destination_table.primary_key.columns.values()[0]
@@ -366,13 +366,14 @@ class Reflection(models.Model):
         ).fetchall()
         if len(ret):
             self.last_commit = dict(ret[0])['id']
-            self.save()
         # Retrive all existing data and mirror it
         data = source_dbc.execute(source_table.select()).fetchall()
         data = [dict(rec) for rec in data]
         if len(data) > 0:
             self.bulk_upsert(data)
+        self.save()
     def reflect(self):
+        self = Reflection.objects.get(pk=self.pk)
         source_dbc = self.source_table.source_database.mount().connect()
         # Read BroadcastingTable's latest pdr_events
         pdr_table = self.source_table.get_pdr_table()
@@ -466,6 +467,7 @@ class Reflection(models.Model):
                 meta.create_all(ddb)
             except Exception as e:
                 raise ValidationError('Failed to create table: {0}'.format(e))
+        self.save()
         self.dump()
         self.refresh()
     def stop(self):
