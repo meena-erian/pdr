@@ -10,6 +10,7 @@ import threading
 # Create your models here.
 pdr_prefix = 'pdr_event'
 pdr_reflection_loops = {}
+pdr_reflection_sessions = {}
 
 def add_column(engine, table_name, column):
     column_name = column.compile(dialect=engine.dialect)
@@ -374,6 +375,11 @@ class Reflection(models.Model):
         self.save()
     def reflect(self):
         self = Reflection.objects.get(pk=self.pk)
+        session_name = 'Performing Reflection: {0}'.format(self.pk)
+        if session_name in pdr_reflection_sessions:
+            print('Cancle. Another session is already running')
+            return
+        pdr_reflection_sessions[session_name] = True
         source_dbc = self.source_table.source_database.mount().connect()
         # Read BroadcastingTable's latest pdr_events
         pdr_table = self.source_table.get_pdr_table()
@@ -404,15 +410,14 @@ class Reflection(models.Model):
         upserts = [retrive_data_record(commit) for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] in ['INSERT', 'UPDATE']]
         deletes = [commit['{0}_c_record'.format(pdr_prefix)] for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] == 'DELETE']
         if len(upserts) > 0:
-            print('Performing {0} upserts actions'.format(len(upserts)))
             self.bulk_upsert(upserts)
         if len(deletes) > 0:
-            print('Performing {0} delete actions'.format(len(deletes)))
             self.bulk_delete(deletes)
         commit_ids = [c['{0}_id'.format(pdr_prefix)] for c in commits]
         if len(commit_ids) > 0:
             self.last_commit = commit_ids[-1]
             self.save()
+        del pdr_reflection_sessions[session_name]
     def __str__(self):
         return '{0}-->{1}.{2} : {3}'.format(self.source_table,self.destination_database, self.destination_table, self.description)
     def clean(self):
@@ -426,7 +431,6 @@ class Reflection(models.Model):
             schema = destTablePath[1]
         else:
             raise ValidationError('Invalid table path: {0}'.format(destTablePath))
-        #source_fields = json.loads(self.source_fields)
         destination_fields = json.loads(self.destination_fields)
         ddb = self.destination_database.mount()
         destinationTable = self.destination_database.get_table(table, schema)
