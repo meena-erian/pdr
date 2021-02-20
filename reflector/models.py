@@ -467,11 +467,13 @@ class Reflection(models.Model):
             except Exception as e:
                 raise ValidationError('Failed to create table: {0}'.format(e))
         self.dump()
+        self.refresh()
     def stop(self):
         self.active = False
         self.save()
     def reflection_loop(self):
-        if self.active:
+        active = Reflection.objects.get(pk=self.pk).active
+        if active:
             WAIT_SECONDS = 1
             self.reflect()
             threading.Timer(WAIT_SECONDS, self.reflection_loop).start()
@@ -481,7 +483,8 @@ class Reflection(models.Model):
         self.active = True
         self.save()
     def refresh(self):
-        if self.active and 'Reflection_loop_{0}'.format(self.pk) not in pdr_reflection_loops:
+        active = Reflection.objects.get(pk=self.pk).active
+        if active and 'Reflection_loop_{0}'.format(self.pk) not in pdr_reflection_loops:
             pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)] = True
             self.reflection_loop()
 

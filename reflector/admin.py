@@ -53,7 +53,7 @@ class ReflectionForm(forms.ModelForm):
             'source_fields': AceWidget(mode='json', readonly=True),
             'reflection_statment': AceWidget(mode='sql')
         }
-        fields = ('description', 'source_table', 'destination_database', 'destination_table', 'source_fields', 'destination_fields', 'reflection_statment')
+        fields = ('description', 'source_table', 'destination_database', 'destination_table', 'source_fields', 'destination_fields', 'reflection_statment', 'active')
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'destination_table' in self.fields:
@@ -66,6 +66,7 @@ class ReflectionForm(forms.ModelForm):
 class ReflectionAdmin(admin.ModelAdmin):
     exclude = ['last_commit']
     form = ReflectionForm
+    list_display = ['__str__', 'active']
     def get_readonly_fields(self, request, obj=None):
         if obj:
             return ['source_table', 'destination_database', 'destination_table']
