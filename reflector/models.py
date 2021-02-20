@@ -336,7 +336,7 @@ class Reflection(models.Model):
                 text(self.reflection_statment),
                 lst
             )
-        print(self, 'Upsert Done')
+        print(self, 'Done Saving')
     def bulk_delete(self, lst):
         print(self, 'Deleting {0} items'.format(len(lst)))
         destination_dbc = self.destination_database.mount().connect()
@@ -346,7 +346,7 @@ class Reflection(models.Model):
         destination_dbc.execute(
             destination_table.delete(destination_table_pk.in_(targer_ids))
         )
-        print(self, 'Delete done')
+        print(self, 'Done Deleting')
     def delete(self, id):
         destination_dbe = self.destination_database.mount()
         destination_dbc = destination_dbe.connect()
@@ -405,8 +405,8 @@ class Reflection(models.Model):
             data_record.pop('{0}_c_time'.format(pdr_prefix))
             return data_record
         commits = [dict(commit) for commit in ret.fetchall()]
-        if len(commits) > 0:
-            print(self, '{0} new events detected'.format(len(commits)))
+        #if len(commits) > 0:
+            #print(self, '{0} new events detected'.format(len(commits)))
         upserts = [retrive_data_record(commit) for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] in ['INSERT', 'UPDATE']]
         deletes = [commit['{0}_c_record'.format(pdr_prefix)] for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] == 'DELETE']
         if len(upserts) > 0:
@@ -437,7 +437,6 @@ class Reflection(models.Model):
         if destinationTable != None:
             # Table already exists, check its compatiblity
             pk_name = destinationTable.primary_key.columns.values()[0].name
-            pk_type = ColTypeToStr(destinationTable.primary_key.columns.values()[0].type)
             if destination_fields['key'] != pk_name:
                 raise ValidationError(
                     'Table \'{0}\' already exists but its primary key is \'{1}\' rather than \'{2}\''
@@ -463,7 +462,7 @@ class Reflection(models.Model):
                     tablecolumns.append(
                         Column(col, StrToColType(destination_fields['columns'][col]), nullable = not ispk, primary_key = ispk)
                     )
-                newTable = Table(
+                Table(
                     table, meta,
                     *tablecolumns,
                     schema=schema
@@ -481,7 +480,11 @@ class Reflection(models.Model):
         active = Reflection.objects.get(pk=self.pk).active
         if active:
             WAIT_SECONDS = 1
-            self.reflect()
+            try:
+                self.reflect()
+            except Exception as e:
+                print('Failed to perform reflection ', self)
+                print(e)
             threading.Timer(WAIT_SECONDS, self.reflection_loop).start()
         else:
             del pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)]
