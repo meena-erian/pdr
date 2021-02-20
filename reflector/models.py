@@ -234,7 +234,7 @@ class BroadcastingTable(models.Model):
             pdr_table_name, meta,
             Column('id', Integer, primary_key = True, autoincrement = True),
             Column('c_action', String(6)),
-            Column('c_record', primaryKey.type, ForeignKey(primaryKey)),
+            Column('c_record', primaryKey.type),
             Column('c_time', DateTime, default=datetime.utcnow)
         )
         meta.create_all(db)
@@ -334,9 +334,17 @@ class Reflection(models.Model):
                 text(self.reflection_statment),
                 lst
             )
-        print(self, 'Done')
+        print(self, 'Upsert Done')
     def bulk_delete(self, lst):
-        None
+        print(self, 'Saving {0} items'.format(len(lst)))
+        destination_dbc = self.destination_database.mount().connect()
+        destination_table = self.get_destination_table()
+        destination_table_pk = destination_table.primary_key.columns.values()[0]
+        targer_ids = lst
+        destination_dbc.execute(
+            destination_table.delete(destination_table_pk.in_(targer_ids))
+        )
+        print(self, 'Delete done')
     def delete(self, id):
         destination_dbe = self.destination_database.mount()
         destination_dbc = destination_dbe.connect()
@@ -361,14 +369,15 @@ class Reflection(models.Model):
         # Retrive all existing data and mirror it
         data = source_dbc.execute(source_table.select()).fetchall()
         data = [dict(rec) for rec in data]
-        self.bulk_upsert(data)
+        if len(data) > 0:
+            self.bulk_upsert(data)
     def reflect(self):
         source_dbc = self.source_table.source_database.mount().connect()
         # Read BroadcastingTable's latest pdr_events
         pdr_table = self.source_table.get_pdr_table()
         data_table = self.source_table.get_table()
         data_table_pk = data_table.primary_key.columns.values()[0]
-        upsert_stmt = pdr_table.join(data_table, pdr_table.c.c_record == data_table_pk).select().with_only_columns([
+        upsert_stmt = pdr_table.join(data_table, pdr_table.c.c_record == data_table_pk, isouter = True, full = True).select().with_only_columns([
             func.max(pdr_table.c.id).label('{0}_id'.format(pdr_prefix)),
             func.max(pdr_table.c.c_action).label('{0}_c_action'.format(pdr_prefix)),
             pdr_table.c.c_record.label('{0}_c_record'.format(pdr_prefix)),
@@ -388,9 +397,16 @@ class Reflection(models.Model):
             data_record.pop('{0}_c_time'.format(pdr_prefix))
             return data_record
         commits = [dict(commit) for commit in ret.fetchall()]
+        if len(commits) > 0:
+            print(self, '{0} new events detected'.format(len(commits)))
         upserts = [retrive_data_record(commit) for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] in ['INSERT', 'UPDATE']]
-        deletes = [retrive_data_record(commit) for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] == 'DELETE']
-        self.bulk_upsert(upserts)
+        deletes = [commit['{0}_c_record'.format(pdr_prefix)] for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] == 'DELETE']
+        if len(upserts) > 0:
+            print('Performing {0} upserts actions'.format(len(upserts)))
+            self.bulk_upsert(upserts)
+        if len(deletes) > 0:
+            print('Performing {0} delete actions'.format(len(deletes)))
+            self.bulk_delete(deletes)
         commit_ids = [c['{0}_id'.format(pdr_prefix)] for c in commits]
         if len(commit_ids) > 0:
             self.last_commit = commit_ids[-1]
