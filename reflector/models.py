@@ -343,9 +343,14 @@ class Reflection(models.Model):
         destination_table = self.get_destination_table()
         destination_table_pk = destination_table.primary_key.columns.values()[0]
         targer_ids = lst
-        destination_dbc.execute(
-            destination_table.delete(destination_table_pk.in_(targer_ids))
-        )
+        limit = 500
+        start = 0
+        while start < len(lst):
+            targer_ids = lst[start:start+limit]
+            destination_dbc.execute(
+                destination_table.delete(destination_table_pk.in_(targer_ids))
+            )
+            start += limit
         print(self, 'Done Deleting')
     def delete(self, id):
         destination_dbe = self.destination_database.mount()
