@@ -19,6 +19,9 @@ fetch(api).then(function (r) {
                 "columns" : j.columns,
                 "key" : j.key
             };
+            key_binding  = { };
+            key_binding[j.key] = j.key;
+            reflection_template_destination['key_binding'] = key_binding;
             let columns_array = Object.keys(j.columns);
             var update_query = `UPDATE ${ destination_table } SET ${ columns_array.map(f => `${ f } = :${ f }`).join(', ')} WHERE ${ j.key } = :${ j.key };`;
             sourceEditor.setValue(JSON.stringify(reflection_source, null, 2));

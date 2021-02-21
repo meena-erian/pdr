@@ -273,9 +273,9 @@ class Reflection(models.Model):
     destination_table = models.CharField(max_length=500)
     last_commit = models.IntegerField(help_text='id of last pdr_event executed', blank=True, null=True)
     active = models.BooleanField('Active', default=True)
-    source_fields = models.CharField(help_text='json representation of the structure of the source table (read only)', max_length=1000)
-    destination_fields = models.CharField(help_text='json configuration that represents the translation from source data to destination structure', max_length=1000)
-    reflection_statment = models.CharField(help_text='SQL statment that will be used to input the data into the destination table whenever the source changes', max_length=1000)
+    source_fields = models.CharField(help_text='json representation of the structure of the source table (read only)', max_length=10000)
+    destination_fields = models.CharField(help_text='json configuration that represents the translation from source data to destination structure', max_length=10000)
+    reflection_statment = models.CharField(help_text='SQL statment that will be used to input the data into the destination table whenever the source changes', max_length=10000)
     def get_destination_table(self):
         dest_table_path = self.destination_table.split('.')
         dest_table_path.reverse()
@@ -283,41 +283,28 @@ class Reflection(models.Model):
         return destination_table
     def get_source_table(self):
         return self.source_table.get_table()
-    def upsert(self, id):
-        source_dbe = self.source_table.source_database.mount()
-        destination_dbe = self.destination_database.mount()
-        source_dbc = source_dbe.connect()
-        destination_dbc = destination_dbe.connect()
-        source_table = self.get_source_table()
-        destination_table = self.get_destination_table()
-        destination_pk = destination_table.primary_key.columns.values()[0]
-        source_pk = source_table.primary_key.columns.values()[0]
-        destination_fields = json.loads(self.destination_fields)
-        ret = source_dbc.execute(
-            source_table.select().where(source_pk == id)
-        )
-        for rec in ret:
-            recDict = dict(rec)
-            # Check if the record already exists in destination db
-            already_exists = destination_dbc.execute(
-                destination_table.select().where(destination_pk == id)
-            ).fetchone()
-            # Insert or update record
-            if already_exists:
-                query = destination_fields['update_query']
-            else:
-                query = destination_fields['insert_query']
-            destination_dbc.execute(text(query), **recDict)
     def bulk_upsert(self, lst):
         print(self, 'Saving {0} items'.format(len(lst)))
         destination_dbc = self.destination_database.mount().connect()
         destination_table = self.get_destination_table()
+        json_config = json.loads(self.destination_fields)
+        if "key_binding" in json_config:
+            for key in json_config["key_binding"]:
+                source_key = key
+                destination_key = json_config["key_binding"][source_key]
+        else:
+            source_key = None
+            destination_key = None
         source_table = self.get_source_table()
         source_table_pk = source_table.primary_key.columns.values()[0]
         destination_table_pk = destination_table.primary_key.columns.values()[0]
         # List missing records
-        targer_ids = [rec[source_table_pk.name] for rec in lst]
-        stmt = select([destination_table_pk], destination_table_pk.in_(targer_ids))
+        if source_key:
+            targer_ids = [rec[source_key] for rec in lst]
+            stmt = select([destination_table.c[destination_key]], destination_table.c[destination_key].in_(targer_ids))
+        else:
+            targer_ids = [rec[source_table_pk.name] for rec in lst]
+            stmt = select([destination_table_pk], destination_table_pk.in_(targer_ids))
         already_existing_records = [rec[0] for rec in destination_dbc.execute(stmt).fetchall()]
         index_of_already_existing_records = {}
         missing_records = []
@@ -327,7 +314,10 @@ class Reflection(models.Model):
             if rec not in already_existing_records:
                 missing_records.append(rec)
         # Create missing records
-        insert_data = [{destination_table_pk.name : item} for item in missing_records]
+        if source_key:
+            insert_data = [{destination_key : item} for item in missing_records]
+        else:
+            insert_data = [{destination_table_pk.name : item} for item in missing_records]
         if len(missing_records) > 0:
             destination_dbc.execute(destination_table.insert(), insert_data)
         # run update statments for each record
@@ -352,16 +342,6 @@ class Reflection(models.Model):
             )
             start += limit
         print(self, 'Done Deleting')
-    def delete(self, id):
-        destination_dbe = self.destination_database.mount()
-        destination_dbc = destination_dbe.connect()
-        dest_table_path = self.destination_table.split('.')
-        dest_table_path.reverse()
-        destination_table = self.destination_database.get_table(*dest_table_path)
-        destination_pk = destination_table.primary_key.columns.values()[0]
-        destination_fields = json.loads(self.destination_fields)
-        params = {destination_pk.name : id}
-        destination_dbc.execute(text(destination_fields['delete_query']), **params)
     def dump(self):
         source_dbc = self.source_table.source_database.mount().connect()
         source_table = self.get_source_table()
@@ -382,7 +362,7 @@ class Reflection(models.Model):
         self = Reflection.objects.get(pk=self.pk)
         session_name = 'Performing Reflection: {0}'.format(self.pk)
         if session_name in pdr_reflection_sessions:
-            print('Cancle. Another session is already running')
+            print('Cancel. Another session is already running')
             return
         pdr_reflection_sessions[session_name] = True
         source_dbc = self.source_table.source_database.mount().connect()
@@ -390,17 +370,19 @@ class Reflection(models.Model):
         pdr_table = self.source_table.get_pdr_table()
         data_table = self.source_table.get_table()
         data_table_pk = data_table.primary_key.columns.values()[0]
-        upsert_stmt = pdr_table.join(data_table, pdr_table.c.c_record == data_table_pk, isouter = True, full = True).select().with_only_columns([
+        upsert_stmt = pdr_table.select().with_only_columns([
             func.max(pdr_table.c.id).label('{0}_id'.format(pdr_prefix)),
             func.max(pdr_table.c.c_action).label('{0}_c_action'.format(pdr_prefix)),
             pdr_table.c.c_record.label('{0}_c_record'.format(pdr_prefix)),
-            func.max(pdr_table.c.c_time).label('{0}_c_time'.format(pdr_prefix)),
-            *[func.max(c).label(c.name) for c in data_table.c]
+            func.max(pdr_table.c.c_time).label('{0}_c_time'.format(pdr_prefix))
         ])
         if self.last_commit:
             upsert_stmt = upsert_stmt.where(pdr_table.c.id > self.last_commit)
         upsert_stmt = upsert_stmt.group_by(pdr_table.c.c_record)
         upsert_stmt = upsert_stmt.order_by('{0}_id'.format(pdr_prefix))
+        upsert_stmt = alias(upsert_stmt, 'pdr')
+        upsert_stmt = upsert_stmt.join(data_table, upsert_stmt.c['{0}_c_record'.format(pdr_prefix)] == data_table_pk)
+        upsert_stmt = select([upsert_stmt])
         ret = source_dbc.execute(upsert_stmt)
         def retrive_data_record(commit):
             data_record = commit.copy()
@@ -436,7 +418,10 @@ class Reflection(models.Model):
             schema = destTablePath[1]
         else:
             raise ValidationError('Invalid table path: {0}'.format(destTablePath))
-        destination_fields = json.loads(self.destination_fields)
+        try:
+            destination_fields = json.loads(self.destination_fields)
+        except Exception as e:
+            raise ValidationError('Unable to parse json: {0}'.format(self.destination_fields))
         ddb = self.destination_database.mount()
         destinationTable = self.destination_database.get_table(table, schema)
         if destinationTable != None:
