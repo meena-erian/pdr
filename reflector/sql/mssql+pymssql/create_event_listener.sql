@@ -3,7 +3,7 @@
 -- {1} $Schema$
 -- {2} $Table$
 -- {3} $Pk$
-CREATE OR ALTER TRIGGER {1}.on_{2}_change ON {2}
+CREATE OR ALTER TRIGGER "{1}".on_{2}_change ON "{2}"
 AFTER
 INSERT, UPDATE, DELETE 
 AS 

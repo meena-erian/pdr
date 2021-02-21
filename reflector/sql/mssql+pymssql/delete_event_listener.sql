@@ -1,7 +1,7 @@
 -- {0} prefix
 -- {1} Schema
 -- {2} table
-DROP TRIGGER {1}.on_{2}_change;
+DROP TRIGGER "{1}".on_{2}_change;
 
 
 
