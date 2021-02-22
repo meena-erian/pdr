@@ -67,7 +67,7 @@ class ReflectionForm(forms.ModelForm):
 class ReflectionAdmin(admin.ModelAdmin):
     exclude = ['last_commit']
     form = ReflectionForm
-    list_display = ['__str__', 'active']
+    list_display = ['__str__', 'last_commit', 'last_updated', 'active']
     def get_readonly_fields(self, request, obj=None):
         if obj:
             return ['source_table', 'destination_database', 'destination_table']

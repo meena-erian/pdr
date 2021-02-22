@@ -1,3 +1,4 @@
+from django.utils import timezone
 from django.db import models
 from django.core.exceptions import ValidationError
 from datetime import datetime
@@ -275,6 +276,7 @@ class Reflection(models.Model):
     destination_database = models.ForeignKey(Database, on_delete=models.CASCADE)        # The destination datastorage
     destination_table = models.CharField(max_length=500)
     last_commit = models.IntegerField(help_text='id of last pdr_event executed', blank=True, null=True)
+    last_updated = models.DateTimeField(blank=True, null=True)
     active = models.BooleanField('Active', default=True)
     source_fields = models.CharField(help_text='json representation of the structure of the source table (read only)', max_length=10000)
     destination_fields = models.CharField(help_text='json configuration that represents the translation from source data to destination structure', max_length=10000)
@@ -354,7 +356,9 @@ class Reflection(models.Model):
             source_pdr_table.select().order_by(desc(source_pdr_table.c.id)).limit(1)
         ).fetchall()
         if len(ret):
-            self.last_commit = dict(ret[0])['id']
+            commit = dict(ret[0])
+            self.last_commit = commit['id']
+            self.last_updated = timezone.make_aware(commit['c_time'])
         # Retrive all existing data and mirror it
         data = source_dbc.execute(source_table.select()).fetchall()
         data = [dict(rec) for rec in data]
@@ -403,9 +407,9 @@ class Reflection(models.Model):
             self.bulk_upsert(upserts)
         if len(deletes) > 0:
             self.bulk_delete(deletes)
-        commit_ids = [c['{0}_id'.format(pdr_prefix)] for c in commits]
-        if len(commit_ids) > 0:
-            self.last_commit = commit_ids[-1]
+        if len(commits) > 0:
+            self.last_commit = commits[-1]['{0}_id'.format(pdr_prefix)]
+            self.last_updated = timezone.make_aware(commits[-1]['{0}_c_time'.format(pdr_prefix)])
             self.save()
         del pdr_reflection_sessions[session_name]
     def __str__(self):
