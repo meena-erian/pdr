@@ -23,7 +23,7 @@ fetch(api).then(function (r) {
             key_binding[j.key] = j.key;
             reflection_template_destination['key_binding'] = key_binding;
             let columns_array = Object.keys(j.columns);
-            var update_query = `UPDATE ${ destination_table } SET ${ columns_array.map(f => `${ f } = :${ f }`).join(', ')} WHERE ${ j.key } = :${ j.key };`;
+            var update_query = `UPDATE\n\t${ destination_table }\nSET\n${ columns_array.map(f => `\t${ f } = :${ f }`).join(',\n')}\nWHERE\n\t${ j.key } = :${ j.key };`;
             sourceEditor.setValue(JSON.stringify(reflection_source, null, 2));
             destinationEditor.setValue(JSON.stringify(reflection_template_destination, null, 2));
             statmentEditor.setValue(update_query)
