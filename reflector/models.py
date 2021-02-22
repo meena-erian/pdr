@@ -214,6 +214,9 @@ class BroadcastingTable(models.Model):
             raise ValidationError('Please select source database')
         if not hasattr(self, 'source_table') or len(self.source_table) < 3:
             raise ValidationError('Please select source table')
+        for bt in BroadcastingTable.objects.all():
+            if(str(bt) == str(self)):
+                raise ValidationError('Broadcasting Table \'{0}\' already exists.'.format(str(self)))
         ### Check if selected table exists in selected database. if not raise ValidationError
         db = self.source_database.mount()
         table_path = self.source_table.split('.')
