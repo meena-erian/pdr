@@ -7,6 +7,7 @@ from sqlalchemy.orm import *
 import urllib.parse
 import json
 import threading
+import pytz
 
 # Create your models here.
 pdr_prefix = 'pdr_event'
@@ -36,7 +37,7 @@ def ColTypeToStr(Type):
     mainParent, path = instanceClassName.split('.', 1)
     if mainParent != 'sqlalchemy':
         raise Exception('Invalid type for SQL')
-    if hasattr(Type, 'length'):
+    if hasattr(Type, 'length') and Type.length > 0:
         path += '({0})'.format(Type.length)
     return path
 
@@ -358,7 +359,10 @@ class Reflection(models.Model):
         if len(ret):
             commit = dict(ret[0])
             self.last_commit = commit['id']
-            self.last_updated = timezone.make_aware(commit['c_time'])
+            self.last_updated = timezone.make_aware(
+                commit['c_time'],
+                timezone=pytz.timezone("UTC")
+            )
         # Retrive all existing data and mirror it
         data = source_dbc.execute(source_table.select()).fetchall()
         data = [dict(rec) for rec in data]
@@ -369,9 +373,9 @@ class Reflection(models.Model):
         self = Reflection.objects.get(pk=self.pk)
         session_name = 'Performing Reflection: {0}'.format(self.pk)
         if session_name in pdr_reflection_sessions:
-            print('Cancel. Another session is already running')
-            return
-        pdr_reflection_sessions[session_name] = True
+            print('Cancel. Another session is already running: {0}'.format(pdr_reflection_sessions[session_name]))
+            raise SystemExit
+        pdr_reflection_sessions[session_name] = threading.currentThread().ident
         source_dbc = self.source_table.source_database.mount().connect()
         # Read BroadcastingTable's latest pdr_events
         pdr_table = self.source_table.get_pdr_table()
@@ -409,7 +413,10 @@ class Reflection(models.Model):
             self.bulk_delete(deletes)
         if len(commits) > 0:
             self.last_commit = commits[-1]['{0}_id'.format(pdr_prefix)]
-            self.last_updated = timezone.make_aware(commits[-1]['{0}_c_time'.format(pdr_prefix)])
+            self.last_updated = timezone.make_aware(
+                commits[-1]['{0}_c_time'.format(pdr_prefix)],
+                timezone=pytz.timezone("UTC")
+            )
             self.save()
         del pdr_reflection_sessions[session_name]
     def __str__(self):
