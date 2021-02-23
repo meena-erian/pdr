@@ -482,7 +482,9 @@ class Reflection(models.Model):
             except Exception as e:
                 print('Failed to perform reflection ', self)
                 print(e)
-            threading.Timer(WAIT_SECONDS, self.reflection_loop).start()
+            t = threading.Timer(WAIT_SECONDS, self.reflection_loop)
+            t.daemon = True
+            t.start()
         else:
             del pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)]
     def start(self):
@@ -492,6 +494,6 @@ class Reflection(models.Model):
         active = Reflection.objects.get(pk=self.pk).active
         if active and 'Reflection_loop_{0}'.format(self.pk) not in pdr_reflection_loops:
             pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)] = True
-            self.reflection_loop()
-
-        
+            t = threading.Timer(1, self.reflection_loop)
+            t.daemon = True
+            t.start()
