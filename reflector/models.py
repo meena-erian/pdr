@@ -13,6 +13,8 @@ import pytz
 pdr_prefix = 'pdr_event'
 pdr_reflection_loops = {}
 pdr_reflection_sessions = {}
+cached_database_metas = {}
+database_engines = {}
 
 def add_column(engine, table_name, column):
     column_name = column.compile(dialect=engine.dialect)
@@ -37,7 +39,7 @@ def ColTypeToStr(Type):
     mainParent, path = instanceClassName.split('.', 1)
     if mainParent != 'sqlalchemy':
         raise Exception('Invalid type for SQL')
-    if hasattr(Type, 'length') and Type.length > 0:
+    if hasattr(Type, 'length') and Type.length != None:
         path += '({0})'.format(Type.length)
     return path
 
@@ -142,6 +144,8 @@ class Database(models.Model):
     def __str__(self):
         return self.handle
     def mount(self):
+        if str(self.pk) in database_engines:
+            return database_engines[str(self.pk)]
         config = json.loads(self.config)
         connectionStr = datasources.__list__[self.source]['dialect'] + '://'
         if 'dbfile' in config:
@@ -153,7 +157,8 @@ class Database(models.Model):
                 connectionStr += ":"
                 connectionStr += str(config["port"])
             connectionStr += "/" + config["dbname"]
-        return create_engine(connectionStr, echo = False)
+        database_engines[str(self.pk)] = create_engine(connectionStr, echo = False)
+        return database_engines[str(self.pk)]
     def tables(self):
         from .methods import make_query
         engine = self.mount().connect()
@@ -167,7 +172,13 @@ class Database(models.Model):
         return results
     def meta(self, schema = None):
         db = self.mount()
-        return MetaData(bind=db, reflect=True, schema=schema)
+        metaid = '{0}.{1}'.format(self.pk, schema)
+        if metaid in cached_database_metas:
+            return cached_database_metas[metaid]
+        else:
+            print('Loading meta data for {0} schema {1}'.format(self, schema))
+            cached_database_metas[metaid] = MetaData(bind=db, reflect=True, schema=schema)
+            return cached_database_metas[metaid]
     def get_table(self, table, schema = None):
         meta = self.meta(schema)
         if schema != None:
