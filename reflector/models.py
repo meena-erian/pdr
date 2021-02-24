@@ -12,7 +12,6 @@ import pytz
 # Create your models here.
 pdr_prefix = 'pdr_event'
 pdr_reflection_loops = {}
-pdr_reflection_sessions = {}
 cached_database_metas = {}
 database_engines = {}
 
@@ -383,10 +382,6 @@ class Reflection(models.Model):
     def reflect(self):
         self = Reflection.objects.get(pk=self.pk)
         session_name = 'Performing Reflection: {0}'.format(self.pk)
-        if session_name in pdr_reflection_sessions:
-            print('Cancel. Another session is already running: {0}'.format(pdr_reflection_sessions[session_name]))
-            raise SystemExit
-        pdr_reflection_sessions[session_name] = threading.currentThread().ident
         source_dbc = self.source_table.source_database.mount().connect()
         # Read BroadcastingTable's latest pdr_events
         pdr_table = self.source_table.get_pdr_table()
@@ -429,7 +424,6 @@ class Reflection(models.Model):
                 timezone=pytz.timezone("UTC")
             )
             self.save()
-        del pdr_reflection_sessions[session_name]
     def __str__(self):
         return '{0}-->{1}.{2} : {3}'.format(self.source_table,self.destination_database, self.destination_table, self.description)
     def clean(self):
@@ -451,6 +445,7 @@ class Reflection(models.Model):
         destinationTable = self.destination_database.get_table(table, schema)
         if destinationTable != None:
             # Table already exists, check its compatiblity
+            print(self, 'Table {0} already exists'.format(destinationTable))
             pk_name = destinationTable.primary_key.columns.values()[0].name
             if destination_fields['key'] != pk_name:
                 raise ValidationError(
@@ -460,6 +455,7 @@ class Reflection(models.Model):
             for needed_column in destination_fields['columns']:
                 c_type = destination_fields['columns'][needed_column]
                 if needed_column not in destinationTable.columns:
+                    print(self, 'Adding column {0} to table {1}'.format(needed_column, destinationTable))
                     ColumnObj = Column(
                         needed_column, 
                         StrToColType(c_type),
@@ -469,6 +465,7 @@ class Reflection(models.Model):
             # Check PK name and type
         else:
             # Table not defined, create table
+            print(self, 'Creating table {0} in database {1}'.format(table, self.destination_database))
             try:
                 meta = MetaData()
                 tablecolumns = []   
@@ -485,6 +482,8 @@ class Reflection(models.Model):
                 meta.create_all(ddb)
             except Exception as e:
                 raise ValidationError('Failed to create table: {0}'.format(e))
+        # Delete destination schema's meta cache to force reloading new updates
+        del cached_database_metas['{0}.{1}'.format(self.destination_database.pk, schema)]
         self.save()
         self.dump()
         self.refresh()
