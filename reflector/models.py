@@ -288,7 +288,8 @@ class Reflection(models.Model):
     destination_table = models.CharField(max_length=500)
     last_commit = models.IntegerField(help_text='id of last pdr_event executed', blank=True, null=True)
     last_updated = models.DateTimeField(blank=True, null=True)
-    active = models.BooleanField('Active', default=True)
+    active = models.BooleanField('Active', help_text='Means that the reflection will be updated whenever the source table is updated', default=True)
+    ignore_delete_events = models.BooleanField('Ignore Delete Events', help_text='Don\'t delete records in the reflection when they\'re deleted in the source.', default=True)
     source_fields = models.CharField(help_text='json representation of the structure of the source table (read only)', max_length=10000)
     destination_fields = models.CharField(help_text='json configuration that represents the translation from source data to destination structure', max_length=10000)
     reflection_statment = models.CharField(help_text='SQL statment that will be used to input the data into the destination table whenever the source changes', max_length=10000)
@@ -381,7 +382,6 @@ class Reflection(models.Model):
         self.save()
     def reflect(self):
         self = Reflection.objects.get(pk=self.pk)
-        session_name = 'Performing Reflection: {0}'.format(self.pk)
         source_dbc = self.source_table.source_database.mount().connect()
         # Read BroadcastingTable's latest pdr_events
         pdr_table = self.source_table.get_pdr_table()
@@ -416,7 +416,10 @@ class Reflection(models.Model):
         if len(upserts) > 0:
             self.bulk_upsert(upserts)
         if len(deletes) > 0:
-            self.bulk_delete(deletes)
+            if self.ignore_delete_events:
+                print(self, 'Ignoring {0} delete events'.format())
+            else:
+                self.bulk_delete(deletes)
         if len(commits) > 0:
             self.last_commit = commits[-1]['{0}_id'.format(pdr_prefix)]
             self.last_updated = timezone.make_aware(
