@@ -142,6 +142,8 @@ class Database(models.Model):
     description = models.CharField(max_length=200, help_text='Describe what this database is all about')
     def __str__(self):
         return self.handle
+    def configs():
+        return datasources.__list__
     def mount(self):
         if str(self.pk) in database_engines:
             return database_engines[str(self.pk)]
