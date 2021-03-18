@@ -256,9 +256,12 @@ class BroadcastingTable(models.Model):
             Column('c_time', DateTime, default=datetime.utcnow)
         )
         meta.create_all(db)
-        metaid = '{0}.{1}'.format(self.source_database.pk, schema)
-        if metaid in cached_database_metas:
-            del cached_database_metas[metaid]
+        metaid_table = '{0}.{1}'.format(self.source_database.pk, schema)
+        metaid_pdr = '{0}.{1}'.format(self.source_database.pk, None)
+        if metaid_table in cached_database_metas:
+            del cached_database_metas[metaid_table]
+        if metaid_pdr in cached_database_metas:
+            del cached_database_metas[metaid_pdr]
         exec_query(
             db,
             datasources.__list__[self.source_database.source]['dialect'] + '/create_event_listener',
