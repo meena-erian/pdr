@@ -17,6 +17,10 @@ from django.contrib import admin
 from django.urls import path
 from reflector import views
 
+admin.site.site_header = "Pantograph Database Replicator Admin"
+admin.site.site_title = "PDR Admin Portal"
+admin.site.index_title = "Welcome to Pantograph Database Replicator Portal"
+
 urlpatterns = [
     path('', admin.site.urls),
     path('api/db/config', views.db_config),
