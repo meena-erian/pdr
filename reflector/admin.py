@@ -58,11 +58,11 @@ class ReflectionForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'destination_table' in self.fields:
-            self.fields['destination_table'].widget.attrs.update({"disabled" : "disabled", "onchange" : make_script('get-broadcasting-template', 'someid')})
+            self.fields['destination_table'].widget.attrs.update({"disabled" : "disabled", "onchange" : make_script('get-reflection-template', 'someid')})
         if 'destination_database' in self.fields:
             self.fields['destination_database'].widget.widget.attrs.update({"onchange" : make_script('bind-connection-tables', 'id_destination_table')})
         if 'source_table' in self.fields:
-            self.fields['source_table'].widget.widget.attrs.update({"onchange" : make_script('get-broadcasting-template', 'someid')})
+            self.fields['source_table'].widget.widget.attrs.update({"onchange" : make_script('get-reflection-template', 'someid')})
 
 class ReflectionAdmin(admin.ModelAdmin):
     exclude = ['last_commit']

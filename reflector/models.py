@@ -230,7 +230,7 @@ class BroadcastingTable(models.Model):
             raise ValidationError('Please select source table')
         for bt in BroadcastingTable.objects.all():
             if(str(bt) == str(self)):
-                raise ValidationError('Broadcasting Table \'{0}\' already exists.'.format(str(self)))
+                raise ValidationError('Table \'{0}\' already declared as source table.'.format(str(self)))
         ### Check if selected table exists in selected database. if not raise ValidationError
         db = self.source_database.mount()
         table_path = self.source_table.split('.')
@@ -291,7 +291,7 @@ class BroadcastingTable(models.Model):
 
 class Reflection(models.Model):
     description = models.CharField(max_length=500)
-    source_table = models.ForeignKey(BroadcastingTable, on_delete=models.CASCADE)       # The source broadcasting table
+    source_table = models.ForeignKey(BroadcastingTable, on_delete=models.CASCADE)       # The source table
     destination_database = models.ForeignKey(Database, on_delete=models.CASCADE)        # The destination datastorage
     destination_table = models.CharField(max_length=500)
     last_commit = models.IntegerField(help_text='id of last pdr_event executed', blank=True, null=True)
