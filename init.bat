@@ -3,6 +3,7 @@ pip install django-ace
 pip install psycopg2
 pip install pytz
 pip install SQLAlchemy
+pip install django-pgcrypto
 python manage.py makemigrations
 python manage.py migrate
 python manage.py collectstatic

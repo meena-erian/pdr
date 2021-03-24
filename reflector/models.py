@@ -8,6 +8,7 @@ import urllib.parse
 import json
 import threading
 import pytz
+import pgcrypto
 
 # Create your models here.
 pdr_prefix = 'pdr_event'
@@ -138,7 +139,7 @@ class datasources:
 class Database(models.Model):
     handle = models.SlugField(max_length=200, help_text='Set a unique name for this database')
     source = models.IntegerField(choices=datasources.touple, help_text='Select what kind of SQL database this is')
-    config = models.CharField(max_length=1000, help_text='Set connection information and credentials')
+    config = pgcrypto.EncryptedTextField(max_length=1000, help_text='Set connection information and credentials')
     description = models.CharField(max_length=200, help_text='Describe what this database is all about')
     def __str__(self):
         return self.handle
