@@ -194,7 +194,7 @@ class Database(models.Model):
         except Exception as e:
             raise ValidationError('Failed to connect to database: {0}'.format(e))
 
-class BroadcastingTable(models.Model):
+class SourceTable(models.Model):
     source_database = models.ForeignKey(Database, on_delete=models.CASCADE)
     source_table = models.CharField(max_length=200)
     description = models.CharField(max_length=500, blank=True)
@@ -228,7 +228,7 @@ class BroadcastingTable(models.Model):
             raise ValidationError('Please select source database')
         if not hasattr(self, 'source_table') or len(self.source_table) < 3:
             raise ValidationError('Please select source table')
-        for bt in BroadcastingTable.objects.all():
+        for bt in SourceTable.objects.all():
             if(str(bt) == str(self)):
                 raise ValidationError('Table \'{0}\' already declared as source table.'.format(str(self)))
         ### Check if selected table exists in selected database. if not raise ValidationError
@@ -287,11 +287,11 @@ class BroadcastingTable(models.Model):
             schema,
             table
         )
-        super(BroadcastingTable, self).delete()
+        super(SourceTable, self).delete()
 
 class Reflection(models.Model):
     description = models.CharField(max_length=500)
-    source_table = models.ForeignKey(BroadcastingTable, on_delete=models.CASCADE)       # The source table
+    source_table = models.ForeignKey(SourceTable, on_delete=models.CASCADE)       # The source table
     destination_database = models.ForeignKey(Database, on_delete=models.CASCADE)        # The destination datastorage
     destination_table = models.CharField(max_length=500)
     last_commit = models.IntegerField(help_text='id of last pdr_event executed', blank=True, null=True)
@@ -391,7 +391,7 @@ class Reflection(models.Model):
     def reflect(self):
         self = Reflection.objects.get(pk=self.pk)
         source_dbc = self.source_table.source_database.mount().connect()
-        # Read BroadcastingTable's latest pdr_events
+        # Read SourceTable's latest pdr_events
         pdr_table = self.source_table.get_pdr_table()
         data_table = self.source_table.get_table()
         data_table_pk = data_table.primary_key.columns.values()[0]

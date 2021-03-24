@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django import forms
-from .models import Database, BroadcastingTable, Reflection
+from .models import Database, SourceTable, Reflection
 from django_ace import AceWidget
 from .methods import make_script
 
@@ -26,17 +26,17 @@ class DatabaseAdmin(admin.ModelAdmin):
         else:
             return []
 
-class BroadcastingTableForm(forms.ModelForm):
+class SourceTableForm(forms.ModelForm):
     class Meta:
-        model = BroadcastingTable
+        model = SourceTable
         fields = ['source_database', 'source_table', 'description']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['source_table'].widget.attrs.update({"disabled" : "disabled"})
         self.fields['source_database'].widget.widget.attrs.update({"onchange" : make_script('list_db_tables')})
 
-class BroadcastingTableAdmin(admin.ModelAdmin):
-    form = BroadcastingTableForm
+class SourceTableAdmin(admin.ModelAdmin):
+    form = SourceTableForm
     exclude = ['fk_name']
     list_display = ['__str__', 'description']
     ordering = ('source_database', 'source_table')
@@ -75,5 +75,5 @@ class ReflectionAdmin(admin.ModelAdmin):
             return []
 
 admin.site.register(Database, DatabaseAdmin)
-admin.site.register(BroadcastingTable, BroadcastingTableAdmin)
+admin.site.register(SourceTable, SourceTableAdmin)
 admin.site.register(Reflection, ReflectionAdmin)

@@ -1,6 +1,6 @@
 #from django.shortcuts import render
 from django.http import HttpResponse
-from .models import Database, BroadcastingTable, Reflection
+from .models import Database, SourceTable, Reflection
 import json
 from django.contrib.admin.views.decorators import staff_member_required
 
@@ -22,7 +22,7 @@ def db_tables(request, dbIdOrHandle):
 @staff_member_required
 def table_fields(request, btID):
     try:
-        bt = BroadcastingTable.objects.get(pk=btID)
+        bt = SourceTable.objects.get(pk=btID)
     except:
         return HttpResponse(json.dumps([]), content_type="application/json")
     ret = bt.get_structure()
