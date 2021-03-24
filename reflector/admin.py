@@ -32,8 +32,10 @@ class SourceTableForm(forms.ModelForm):
         fields = ['source_database', 'source_table', 'description']
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['source_table'].widget.attrs.update({"disabled" : "disabled"})
-        self.fields['source_database'].widget.widget.attrs.update({"onchange" : make_script('list_db_tables')})
+        if 'source_table' in self.fields:
+            self.fields['source_table'].widget.attrs.update({"disabled" : "disabled"})
+        if 'source_database' in self.fields:
+            self.fields['source_database'].widget.widget.attrs.update({"onchange" : make_script('list_db_tables')})
 
 class SourceTableAdmin(admin.ModelAdmin):
     form = SourceTableForm
