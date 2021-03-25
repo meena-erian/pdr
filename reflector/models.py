@@ -4,37 +4,44 @@ from django.core.exceptions import ValidationError
 from datetime import datetime
 from sqlalchemy import *
 from sqlalchemy.orm import *
+from .datasources import datasources
 import urllib.parse
 import json
 import threading
 import pytz
 import pgcrypto
 
-# Create your models here.
 pdr_prefix = 'pdr_event'
 pdr_reflection_loops = {}
 cached_database_metas = {}
 database_engines = {}
 
 def add_column(engine, table_name, column):
+    """
+    This function is used to add a new field to an already existing table in a database.
+    """
     column_name = column.compile(dialect=engine.dialect)
     column_type = column.type.compile(engine.dialect)
     engine.execute('ALTER TABLE %s ADD COLUMN %s %s NULL' % (table_name, column_name, column_type))
 
-def get_pk(table):
-    from sqlalchemy.inspection import inspect
-    ins = inspect(table)
-    return ins.identity
-
 def typeFullName(o):
-  module = o.__class__.__module__
-  if module is None or module == str.__class__.__module__:
-    return o.__class__.__name__  # Avoid reporting __builtin__
-  else:
-    return module + '.' + o.__class__.__name__
-
+    """
+    This function takes any user defined object or class of any type and returns 
+    a string absolute identifier of the provided type.
+    """
+    module = o.__class__.__module__
+    if module is None or module == str.__class__.__module__:
+        return o.__class__.__name__  # Avoid reporting __builtin__
+    else:
+        return module + '.' + o.__class__.__name__
 
 def ColTypeToStr(Type):
+    """
+    This function takes an SQLAlchemy Column type and returns a string identifier of 
+    that type after validating that it is a valid SQLAlchemy column type.
+
+    This function is the inverse of the function StrToColType
+    """
     instanceClassName = typeFullName(Type)
     mainParent, path = instanceClassName.split('.', 1)
     if mainParent != 'sqlalchemy':
@@ -44,6 +51,12 @@ def ColTypeToStr(Type):
     return path
 
 def StrToColType(TypePath):
+    """
+    This function takes a string SQLAlchemy Column type identifier and returns 
+    an SQLAlchemy type definition class of the provided type.
+
+    This function is the inverse of the function ColTypeToStr
+    """
     import sqlalchemy
     pathentries = TypePath.split('.')
     currentEntry = sqlalchemy
@@ -56,87 +69,11 @@ def StrToColType(TypePath):
             currentEntry = currentEntry.__dict__[entry] 
     return currentEntry
 
-
-class datasources:
-    touple = (
-        (0, "PostgreSQL"),
-        (1, "Microsoft SQL"),
-        (2, "MySQL/MariaDB"),
-        (3, "SQLite"),
-        (4, "FireBird")
-    )
-    POSTGRESQL  = 0
-    MSSQL       = 1
-    MYSQL       = 2
-    SQLIGHT     = 3
-    FIREBIRD    = 4
-    __list__ = [
-        {
-            "name" : "PostgreSQL",
-            "dialect" : "postgresql",
-            "config" : {
-                "dbname": "databasename",
-                "user": "username",
-                "password": "password",
-                "host": "hostname or IP address",
-                "port": 5432
-            }
-        },
-        {
-            "name" : "Microsoft SQL",
-            "dialect" : "mssql+pymssql",
-            "config" : {
-                "dbname": "master",
-                "user": "sa",
-                "password": "",
-                "host": "localhost",
-                "port": 1433
-            }
-        },
-        {
-            "name" : "MySQL",
-            "dialect" : "mysql+mysqldb",
-            "config" : {
-                "dbname": "master",
-                "user": "root",
-                "password": "password",
-                "host": "localhost",
-                "port": 3306
-            }
-        },
-        {
-            "name" : "SQLite",
-            "dialect" : "sqlite+pysqlite",
-            "config" : {
-                "dbfile" : "path/to/database.db"
-            }
-        },
-        {
-            "name" : "FireBird",
-            "dialect" : "firebird+kinterbasdb",
-            "config" : {
-                "dbname": "databasename",
-                "user": "SYSDBA",
-                "password": "masterkey",
-                "host": "localhost",
-                "path": "C:/projects/databases/myproject.fdb",
-                "port": 3050
-            }
-        },
-    ]
-    @classmethod
-    def config(self, sourceid = -1):
-        if sourceid == -1:
-            return self.__list__
-        return self.__list__[sourceid]["config"]
-    @classmethod
-    def json(self, sourceid = -1):
-        if sourceid == -1:
-            return json.dumps(self.__list__, indent=2)
-        return json.dumps(self.__list__[sourceid]["config"], indent=2)
-
-
 class Database(models.Model):
+    """
+    This data model describes a database connection information and it provides 
+    functions to interact with databases.
+    """
     handle = models.SlugField(max_length=200, help_text='Set a unique name for this database')
     source = models.IntegerField(choices=datasources.touple, help_text='Select what kind of SQL database this is')
     config = pgcrypto.EncryptedTextField(max_length=1000, help_text='Set connection information and credentials')
@@ -146,6 +83,15 @@ class Database(models.Model):
     def configs():
         return datasources.__list__
     def mount(self):
+        """
+        This function returns an instance of an SQLAlchemy database_engine of the database
+         configured in the object calling the method. 
+
+        For perfomance, each time this function is called, it saved a copy of the engine in 
+         the database_engines dictionary so that when it's called again for the same database,
+         it will first look in the dictionary and if it find that the engine is already saved
+         there, it will return it directly from there.
+        """
         if str(self.pk) in database_engines:
             return database_engines[str(self.pk)]
         config = json.loads(self.config)
@@ -162,6 +108,10 @@ class Database(models.Model):
         database_engines[str(self.pk)] = create_engine(connectionStr, echo = False)
         return database_engines[str(self.pk)]
     def tables(self):
+        """
+        This function returns a list of all tables in the database from which 
+         the function is being called.
+        """
         from .methods import make_query
         engine = self.mount().connect()
         results = []
@@ -173,6 +123,15 @@ class Database(models.Model):
             results.append(record[0])
         return results
     def meta(self, schema = None):
+        """
+        This function returns an SQLAlchemy database MetaData object of the database from which the 
+         function is being called. 
+
+        For perfomance, each time this function is called, it saved a copy of the MetaData object in 
+         the cached_database_metas dictionary so that when it's called again for the same database,
+         it will first look in the dictionary and if it found that the MetaDate is already saved
+         there, it will return it directly from there.
+        """
         db = self.mount()
         metaid = '{0}.{1}'.format(self.pk, schema)
         if metaid in cached_database_metas:
@@ -182,6 +141,10 @@ class Database(models.Model):
             cached_database_metas[metaid] = MetaData(bind=db, reflect=True, schema=schema)
             return cached_database_metas[metaid]
     def get_table(self, table, schema = None):
+        """
+        This function returns an SQLAlchemy Table object for the table identified by 
+         'table', and 'schema' (optional)
+        """
         meta = self.meta(schema)
         if schema != None:
             table = schema + '.' + table
@@ -190,6 +153,9 @@ class Database(models.Model):
         else:
             return None
     def clean(self):
+        """
+        This function is used to calidate database connection information before saving it.
+        """
         try:
             self.mount().connect()
         except Exception as e:
@@ -199,7 +165,6 @@ class SourceTable(models.Model):
     source_database = models.ForeignKey(Database, on_delete=models.CASCADE)
     source_table = models.CharField(max_length=200)
     description = models.CharField(max_length=500, blank=True)
-    fk_name = models.CharField(max_length=500, blank=True, null=True)
     def get_table(self):
         path = self.source_table.split('.')
         path.reverse()

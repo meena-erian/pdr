@@ -4,14 +4,14 @@ from .models import Database, SourceTable, Reflection
 import json
 from django.contrib.admin.views.decorators import staff_member_required
 
-
-# Create your views here.
 @staff_member_required
 def db_config(request):
+    """A function used to create a REASTful API to listing default configurations for each RDBMS type"""
     return  HttpResponse(json.dumps(Database.configs(), indent = 2), content_type="application/json")
 
 @staff_member_required
 def db_tables(request, dbIdOrHandle):
+    """A function used to list all tables in a specific database"""
     try:
         if dbIdOrHandle.isnumeric():
             return HttpResponse(json.dumps(Database.objects.get(pk=dbIdOrHandle).tables(), indent = 2), content_type="application/json")
@@ -21,6 +21,7 @@ def db_tables(request, dbIdOrHandle):
 
 @staff_member_required
 def table_fields(request, btID):
+    """A function used to retrive the structure of a source table"""
     try:
         bt = SourceTable.objects.get(pk=btID)
     except:
@@ -32,4 +33,4 @@ try:
     for reflection in Reflection.objects.all():
         reflection.refresh()
 except Exception as e:
-    print('Error starting reflections:', e)
+    print('Cannot start reflections:', e)
