@@ -7,6 +7,7 @@ The reflector app is the main app of the Pantograph Database Replicator.
 If you would like to contribute to Pantograph Database Replicator or 
 understaing how it works internally, Then this README file is where you should start.
 
+<br />
 
 ## How it works
 
@@ -16,6 +17,20 @@ understaing how it works internally, Then this README file is where you should s
 4. After declaring a table as a [SourceTable](#SourceTable), a [Reflection](#Reflection) can be created for such table in any database connected to the [pdr server](#pdr-server), 
 5. The [pdr server](#pdr-server) listens for [pdr event](#pdr-event)s for each active reflection. 
 6. Once new [pdr event](#pdr-event)s are added for any [SourceTable](#SourceTable), the [pdr server](#pdr-server) replicates the changes to the remote table defined as a [Reflection](#Reflection) and saves the id of the last replicated event in order to mark the [pdr event](#pdr-event) as read.
+
+<br />
+
+## Important items in this directory
+
+1. **[js](/reflector/js) folder:** This folder contains JavaScript templetes for adding some interactivity to the client side.
+2. **[sql](/reflector/js) folder:** This folder contains SQL templates used to run advanced database commands that cannot be otherwise performed using SQLAlchemy.
+3. **[admin.py](/reflector/admin.py):** This file defines how users can manage PDR from the Django admin portal
+4. **[methods.py](/reflector/methods.py):** This file defines some functions for general use such as ```make_query``` and ```make_script``` which are used to load code templates from the folders [sql](/reflector/js) and [js](/reflector/js).
+5. **[models.py](/reflector/models.py):** This is basically the core of PDR. it defines not only all data models stored in the pdr server as the server settings but also all methods associated with each.
+6. **[views.py](/reflector/views.py):** This file defines server-side APIs used to perform some client-server communication.
+
+<br />
+<br />
 
 ## Definitions
 
