@@ -1,6 +1,6 @@
 var source = document.querySelector("#id_source_table");
 if (!source.value) return;
-api = `/api/broadcaster/${source.value}/fields`;
+api = `/api/source/${source.value}/fields`;
 console.log('Fetching: ', api);
 fetch(api).then(function (r) {
     r.json().then(function (j) {

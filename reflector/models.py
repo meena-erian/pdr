@@ -372,7 +372,7 @@ class Reflection(models.Model):
         source_dbc = self.source_table.source_database.mount().connect()
         source_table = self.get_source_table()
         source_pdr_table = self.source_table.get_pdr_table()
-        # Check if we have any pdr events for this broadcaster and update "last_commit"
+        # Check if we have any pdr events for this source and update "last_commit"
         ret = source_dbc.execute(
             source_pdr_table.select().order_by(desc(source_pdr_table.c.id)).limit(1)
         ).fetchall()
