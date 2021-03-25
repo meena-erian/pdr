@@ -29,9 +29,9 @@ Thus, the number inside the curly brackets is the order of the variable when mak
 
 ## **WARNING**
 
-The make_query and exec_query functions do not excape arguments. 
+The make_query and exec_query functions do not escape arguments. 
 When using these functions you must make sure arguments are properly
- excaped before using them in such functions in order to avoid SQL injection.
+ escaped before using them in such functions, in order to avoid SQL injection.
 
 <br />
 <br />
