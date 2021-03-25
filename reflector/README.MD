@@ -23,7 +23,7 @@ understaing how it works internally, Then this README file is where you should s
 ## Important items in this directory
 
 1. **[js](/reflector/js) folder:** This folder contains JavaScript templetes for adding some interactivity to the client side.
-2. **[sql](/reflector/js) folder:** This folder contains SQL templates used to run advanced database commands that cannot be otherwise performed using SQLAlchemy.
+2. **[sql](/reflector/sql) folder:** This folder contains SQL templates used to run advanced database commands that cannot be otherwise performed using SQLAlchemy.
 3. **[admin.py](/reflector/admin.py):** This file defines how users can manage PDR from the Django admin portal
 4. **[methods.py](/reflector/methods.py):** This file defines some functions for general use such as ```make_query``` and ```make_script``` which are used to load code templates from the folders [sql](/reflector/js) and [js](/reflector/js).
 5. **[models.py](/reflector/models.py):** This is basically the core of PDR. it defines not only all data models stored in the pdr server as the server settings but also all methods associated with each.

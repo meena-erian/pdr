@@ -65,3 +65,9 @@ translating to each dialect whenever applicable.
 
 All variables being using in an SQL template file must be defined at the 
 begging of the file. (if any)
+
+
+### **Rule#3 self-explainatory filnames**
+
+The name of each SQL file should provide a clear idea of what the queries inside of it
+does, just like a function name.
