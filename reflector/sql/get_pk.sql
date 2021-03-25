@@ -1,3 +1,6 @@
+-- VARIABLES
+-- {0} $Schema$
+-- {2} $Table$
 SELECT
     kcu.column_name as "PRIMARY_KEY",
     c.data_type as "DATA_TYPE"

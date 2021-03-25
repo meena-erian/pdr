@@ -1,3 +1,11 @@
+/**
+ * This script is meant to be interpreted whenever the user selects a database 
+ *  from the HTML select element for the SourceTable admin form.
+ * 
+ * Once triggered, it connects to the API `/api/db/<dbId>/tables`, retrives a list
+ * of all tables existing in the selected database and inserts them in the DOM as a
+ * an html <datalist> element for the table input of the form
+ */
 var dbSelect = this;
 if (!dbSelect.value) return;
 api = `/api/db/${this.value}/tables`;

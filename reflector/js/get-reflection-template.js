@@ -1,3 +1,12 @@
+/**
+ * This script is meant to be interpreted whenever the user changes the destination table
+ *  or the source table in the from HTML elements for the Reflection admin form.
+ * 
+ * Once triggered, it connects to the API `/api/source/<sourceTableId>/fields`, retrives the structure
+ * of of the selected source table and then it selects the DOM element for the destination_table and 
+ * retrives from it the current value for the destination table. and based on thes values it generates
+ * reflection configurations (Source fields, destination fields and reflections statment)
+ */
 var source = document.querySelector("#id_source_table");
 if (!source.value) return;
 api = `/api/source/${source.value}/fields`;

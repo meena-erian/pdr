@@ -1,3 +1,4 @@
+-- VARIABLES
 -- {0} prefix
 -- {1} schema
 -- {2} table
