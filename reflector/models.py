@@ -40,7 +40,7 @@ def ColTypeToStr(Type):
     This function takes an SQLAlchemy Column type and returns a string identifier of 
     that type after validating that it is a valid SQLAlchemy column type.
 
-    This function is the inverse of the function StrToColType
+    This function is the inverse of the function StrToColType.
     """
     instanceClassName = typeFullName(Type)
     mainParent, path = instanceClassName.split('.', 1)
@@ -55,7 +55,7 @@ def StrToColType(TypePath):
     This function takes a string SQLAlchemy Column type identifier and returns 
     an SQLAlchemy type definition class of the provided type.
 
-    This function is the inverse of the function ColTypeToStr
+    This function is the inverse of the function ColTypeToStr.
     """
     import sqlalchemy
     pathentries = TypePath.split('.')
@@ -142,7 +142,7 @@ class Database(models.Model):
             return cached_database_metas[metaid]
     def get_table(self, table, schema = None):
         """
-        This function returns an SQLAlchemy Table object for the table identified by 
+        This function returns an SQLAlchemy Table object for the table identified by.
          'table', and 'schema' (optional)
         """
         meta = self.meta(schema)
@@ -162,20 +162,40 @@ class Database(models.Model):
             raise ValidationError('Failed to connect to database: {0}'.format(e))
 
 class SourceTable(models.Model):
+    """
+    A source table is a table that updates other tables, typically in other databases 
+     when any records of that table are added, removed, or modified.
+
+    Any existing database table in any database connected to the PDR server can be
+     added as a SourceTable. Once added, it's being monitored by the PDR server; so that 
+     whenever any changes occur in any record in that table, the PDR server will be notifed
+     in order to update reflections.
+    """
     source_database = models.ForeignKey(Database, on_delete=models.CASCADE)
     source_table = models.CharField(max_length=200)
     description = models.CharField(max_length=500, blank=True)
     def get_table(self):
+        """
+        Retrives the SQLAlchemy Table object of the source table from which the function was called.
+        """
         path = self.source_table.split('.')
         path.reverse()
         return self.source_database.get_table(*path)
     def get_pdr_table(self):
+        """
+        Retrives the notification channel Table object (AKA pdr_table) of the source table
+         from which the function was called.
+        """
         table_path = self.source_table.split('.')
         if len(table_path) == 1:
             table_path.insert(0, 'None')
         pdr_table_name = '{0}_o_{1}_o_{2}'.format(pdr_prefix, *table_path)
         return self.source_database.get_table(pdr_table_name)
     def get_structure(self):
+        """
+        Retrives a dict object describing the structure of the source table from which the 
+         function was called.
+        """
         ret = {"columns": {}}
         table = self.get_table()
         for column in table.columns:
@@ -189,6 +209,11 @@ class SourceTable(models.Model):
     def __str__(self):
         return self.source_database.handle + '.' + self.source_table
     def clean(self):
+        """
+        This function installs SQL trigger functions and creates a notification channel table in the source
+         database once a new source table is defined. The trigger functions are configured to update 
+         notification channel table (AKA pdr_table) whenever any changes occur in the source table. 
+        """
         from .methods import exec_query
         if not hasattr(self, 'source_database'):
             raise ValidationError('Please select source database')
@@ -237,6 +262,10 @@ class SourceTable(models.Model):
             primaryKey.name
         )
     def delete(self):
+        """
+        This function is meant to delete the pdr table and the trigger functions that was 
+         initially created by the 'clean()' function.
+        """
         from .methods import exec_query
         table_path = self.source_table.split('.')
         if len(table_path) == 1:
@@ -277,7 +306,9 @@ class Reflection(models.Model):
     def bulk_upsert(self, lst):
         print(self, 'Saving {0} items'.format(len(lst)))
         destination_dbc = self.destination_database.mount().connect()
+        print(self, 'retriving destination table')
         destination_table = self.get_destination_table()
+        print(self, 'retriving json config')
         json_config = json.loads(self.destination_fields)
         if "key_binding" in json_config:
             for key in json_config["key_binding"]:
@@ -286,37 +317,71 @@ class Reflection(models.Model):
         else:
             source_key = None
             destination_key = None
+        print(self, 'retriving source table')
         source_table = self.get_source_table()
+        print(self, 'retriving source PK')
         source_table_pk = source_table.primary_key.columns.values()[0]
+        print(self, 'retriving destination PK')
         destination_table_pk = destination_table.primary_key.columns.values()[0]
         # List missing records
+        already_existing_records = []
+        print(self, 'listing already existing records')
+        limit = 500
+        start = 0
         if source_key:
             targer_ids = [rec[source_key] for rec in lst]
-            stmt = select([destination_table.c[destination_key]], destination_table.c[destination_key].in_(targer_ids))
+            ids_to_select = targer_ids.copy()
+            while start < len(ids_to_select):
+                print(self, 'listing records from {0}, to {1}'.format(start, start+limit))
+                selected_ids = ids_to_select[start:start+limit]
+                ret = destination_dbc.execute(
+                    select([destination_table.c[destination_key]], destination_table.c[destination_key].in_(selected_ids))
+                ).fetchall()
+                already_existing_records.extend([rec[0] for rec in ret])
+                start += limit
         else:
             targer_ids = [rec[source_table_pk.name] for rec in lst]
-            stmt = select([destination_table_pk], destination_table_pk.in_(targer_ids))
-        already_existing_records = [rec[0] for rec in destination_dbc.execute(stmt).fetchall()]
+            ids_to_select = targer_ids.copy()
+            while start < len(ids_to_select):
+                print(self, 'listing records from {0}, to {1}'.format(start, start+limit))
+                selected_ids = ids_to_select[start:start+limit]
+                ret = destination_dbc.execute(
+                    select([destination_table_pk], destination_table_pk.in_(selected_ids))
+                ).fetchall()
+                already_existing_records.extend([rec[0] for rec in ret])
+                start += limit
         index_of_already_existing_records = {}
         missing_records = []
+        print(self, '{0} records already exists. Selecting missing records'.format(len(already_existing_records)))
         for rec in already_existing_records:
             index_of_already_existing_records[rec] = 'EXISTS'
         for rec in targer_ids:
-            if rec not in already_existing_records:
+            if rec not in index_of_already_existing_records:
                 missing_records.append(rec)
+        print(self, '{0} missing records were identified'.format(len(missing_records)))
         # Create missing records
         if source_key:
             insert_data = [{destination_key : item} for item in missing_records]
         else:
             insert_data = [{destination_table_pk.name : item} for item in missing_records]
         if len(missing_records) > 0:
+            print(self, 'Creating {0} missing records'.format(len(missing_records)))
             destination_dbc.execute(destination_table.insert(), insert_data)
+        else:
+            print(self, 'All recrods already exists. Updating records data')
         # run update statments for each record
-        if len(targer_ids) > 0:
-            destination_dbc.execute(
-                text(self.reflection_statment),
-                lst
-            )
+        if len(lst) > 0:
+            print(self, 'Updating data for {0} records'.format(len(lst)))
+            limit = 500
+            start = 0
+            while start < len(lst):
+                print(self, 'Updating records from {0}, to {1}'.format(start, start+limit))
+                selected_items = lst[start:start+limit]
+                destination_dbc.execute(
+                    text(self.reflection_statment),
+                    selected_items
+                )
+                start += limit
         print(self, 'Done Saving')
     def bulk_delete(self, lst):
         print(self, 'Deleting {0} items'.format(len(lst)))
