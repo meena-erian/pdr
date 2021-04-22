@@ -204,7 +204,16 @@ class SourceTable(models.Model):
             else:
                 c_type = None
             ret['columns'][column.name] = c_type
-        ret['key'] = table.primary_key.columns.values()[0].name
+        primary_key_columns = table.primary_key.columns.values()
+        if len(primary_key_columns):
+            ret['key'] = primary_key_columns[0].name
+        else:
+            foreign_keys = list(table.foreign_keys)
+            if len(foreign_keys):
+                ret['key'] = foreign_keys[0].column.name
+            else:
+                raise ValidationError('Failed to define structure for table {0} because \
+                it has no primary key or even foreign key', table)
         return ret
     def __str__(self):
         return self.source_database.handle + '.' + self.source_table
@@ -236,7 +245,16 @@ class SourceTable(models.Model):
             table_obj = Table(table, MetaData(), autoload=True, autoload_with=db, schema=schema)
         except Exception as e:
             raise ValidationError('Table not found: {0}'.format(e))
-        primaryKey = table_obj.primary_key.columns.values()[0]
+        primary_key_columns = table_obj.primary_key.columns.values()
+        if len(primary_key_columns):
+            primaryKey = primary_key_columns[0]
+        else:
+            foreign_keys = list(table_obj.foreign_keys)
+            if len(foreign_keys):
+                primaryKey = foreign_keys[0].column
+            else:
+                raise ValidationError('Failed to install notification channel on table {0} because \
+                it has no primary key or even foreign key', table)
         pdr_table_name = '{0}_o_{1}_o_{2}'.format(pdr_prefix, schema, table)
         meta = MetaData()
         pdr_event = Table(
@@ -320,7 +338,16 @@ class Reflection(models.Model):
         print(self, 'retriving source table')
         source_table = self.get_source_table()
         print(self, 'retriving source PK')
-        source_table_pk = source_table.primary_key.columns.values()[0]
+        source_primary_key_columns = source_table.primary_key.columns.values()
+        if len(source_primary_key_columns):
+            source_table_pk = source_primary_key_columns[0]
+        else:
+            foreign_keys = list(source_table.foreign_keys)
+            if len(foreign_keys):
+                source_table_pk = foreign_keys[0].column
+            else:
+                raise ValidationError('Failed to replicate data to table {0} because \
+                it has no primary key or even foreign key', source_table)
         print(self, 'retriving destination PK')
         destination_table_pk = destination_table.primary_key.columns.values()[0]
         # List missing records

@@ -19,6 +19,7 @@ fetch(api).then(function (r) {
         var statmentEditor = editors[2].env.editor;
         var destination_table = document.querySelector("#id_destination_table").value;
         if(!destination_table.length) destination_table = 'destination_table';
+        destination_table = destination_table.split('.').map(item => `"${ item }"`).join('.')
         if (j.columns) {
             var reflection_source = {
                 "columns" : j.columns,
@@ -32,7 +33,7 @@ fetch(api).then(function (r) {
             key_binding[j.key] = j.key;
             reflection_template_destination['key_binding'] = key_binding;
             let columns_array = Object.keys(j.columns);
-            var update_query = `UPDATE\n\t${ destination_table }\nSET\n${ columns_array.map(f => `\t${ f } = :${ f }`).join(',\n')}\nWHERE\n\t${ j.key } = :${ j.key };`;
+            var update_query = `UPDATE\n\t${ destination_table }\nSET\n${ columns_array.map(f => `\t"${ f }" = :${ f }`).join(',\n')}\nWHERE\n\t"${ j.key }" = :${ j.key };`;
             sourceEditor.setValue(JSON.stringify(reflection_source, null, 2));
             destinationEditor.setValue(JSON.stringify(reflection_template_destination, null, 2));
             statmentEditor.setValue(update_query)
