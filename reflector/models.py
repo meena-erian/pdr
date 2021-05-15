@@ -16,18 +16,27 @@ pdr_reflection_loops = {}
 cached_database_metas = {}
 database_engines = {}
 
+
 def add_column(engine, table_name, column):
     """
-    This function is used to add a new field to an already existing table in a database.
+    This function is used to add a new field to an already
+    existing table in a database.
     """
     column_name = column.compile(dialect=engine.dialect)
     column_type = column.type.compile(engine.dialect)
-    engine.execute('ALTER TABLE %s ADD COLUMN %s %s NULL' % (table_name, column_name, column_type))
+    engine.execute(
+        'ALTER TABLE %s ADD COLUMN %s %s NULL' % (
+            table_name,
+            column_name,
+            column_type
+        )
+    )
+
 
 def typeFullName(o):
     """
-    This function takes any user defined object or class of any type and returns 
-    a string absolute identifier of the provided type.
+    This function takes any user defined object or class of any type and
+    returns a string absolute identifier of the provided type.
     """
     module = o.__class__.__module__
     if module is None or module == str.__class__.__module__:
@@ -35,10 +44,12 @@ def typeFullName(o):
     else:
         return module + '.' + o.__class__.__name__
 
+
 def ColTypeToStr(Type):
     """
-    This function takes an SQLAlchemy Column type and returns a string identifier of 
-    that type after validating that it is a valid SQLAlchemy column type.
+    This function takes an SQLAlchemy Column type and returns a string
+    identifier of that type after validating that it is a valid
+    SQLAlchemy column type.
 
     This function is the inverse of the function StrToColType.
     """
@@ -46,14 +57,15 @@ def ColTypeToStr(Type):
     mainParent, path = instanceClassName.split('.', 1)
     if mainParent != 'sqlalchemy':
         raise Exception('Invalid type for SQL')
-    if hasattr(Type, 'length') and Type.length != None:
+    if hasattr(Type, 'length') and Type.length is not None:
         path += '({0})'.format(Type.length)
     return path
 
+
 def StrToColType(TypePath):
     """
-    This function takes a string SQLAlchemy Column type identifier and returns 
-    an SQLAlchemy type definition class of the provided type.
+    This function takes a string SQLAlchemy Column type identifier
+    and returns an SQLAlchemy type definition class of the provided type.
 
     This function is the inverse of the function ColTypeToStr.
     """
@@ -66,31 +78,48 @@ def StrToColType(TypePath):
             varLength = int(varLength.strip(' ()'))
             currentEntry = currentEntry.__dict__[className](varLength)
         else:
-            currentEntry = currentEntry.__dict__[entry] 
+            currentEntry = currentEntry.__dict__[entry]
     return currentEntry
+
 
 class Database(models.Model):
     """
-    This data model describes a database connection information and it provides 
-    functions to interact with databases.
+    This data model describes a database connection information and it
+    provides functions to interact with databases.
     """
-    handle = models.SlugField(max_length=200, help_text='Set a unique name for this database')
-    source = models.IntegerField(choices=datasources.touple, help_text='Select what kind of SQL database this is')
-    config = pgcrypto.EncryptedTextField(max_length=1000, help_text='Set connection information and credentials')
-    description = models.CharField(max_length=200, help_text='Describe what this database is all about')
+    handle = models.SlugField(
+        max_length=200,
+        help_text='Set a unique name for this database'
+    )
+    source = models.IntegerField(
+        choices=datasources.touple,
+        help_text='Select what kind of SQL database this is'
+    )
+    config = pgcrypto.EncryptedTextField(
+        max_length=1000,
+        help_text='Set connection information and credentials'
+    )
+    description = models.CharField(
+        max_length=200,
+        help_text='Describe what this database is all about'
+    )
+
     def __str__(self):
         return self.handle
+
     def configs():
         return datasources.__list__
+
     def mount(self):
         """
-        This function returns an instance of an SQLAlchemy database_engine of the database
-         configured in the object calling the method. 
+        This function returns an instance of an SQLAlchemy database_engine of
+         the database configured in the object calling the method.
 
-        For perfomance, each time this function is called, it saved a copy of the engine in 
-         the database_engines dictionary so that when it's called again for the same database,
-         it will first look in the dictionary and if it find that the engine is already saved
-         there, it will return it directly from there.
+        For perfomance, each time this function is called, it saved a copy of
+         the engine in the database_engines dictionary so that when it's called
+         again for the same database, it will first look in the dictionary and
+         if it find that the engine is already saved there, it will return it
+
         """
         if str(self.pk) in database_engines:
             return database_engines[str(self.pk)]
@@ -99,38 +128,48 @@ class Database(models.Model):
         if 'dbfile' in config:
             connectionStr += '/' + config['dbfile']
         else:
-            connectionStr += urllib.parse.quote_plus(config['user']) + ":" + urllib.parse.quote_plus(config['password']) + "@"
+            connectionStr += (
+                urllib.parse.quote_plus(config['user'])
+                + ":"
+                + urllib.parse.quote_plus(config['password'])
+                + "@"
+            )
             connectionStr += config['host']
             if "port" in config:
                 connectionStr += ":"
                 connectionStr += str(config["port"])
             connectionStr += "/" + config["dbname"]
-        database_engines[str(self.pk)] = create_engine(connectionStr, echo = False)
+        database_engines[str(self.pk)] = create_engine(
+            connectionStr, echo=False)
         return database_engines[str(self.pk)]
+
     def tables(self):
         """
-        This function returns a list of all tables in the database from which 
+        This function returns a list of all tables in the database from which
          the function is being called.
         """
         from .methods import make_query
         engine = self.mount().connect()
         results = []
         if self.source == datasources.SQLIGHT:
-            ret = engine.execute(make_query(datasources.__list__[self.source]['dialect'] + '/list_tables'))
+            ret = engine.execute(make_query(datasources.__list__[
+                                 self.source]['dialect'] + '/list_tables'))
         else:
             ret = engine.execute(make_query('list_tables'))
         for record in ret:
             results.append(record[0])
         return results
-    def meta(self, schema = None):
-        """
-        This function returns an SQLAlchemy database MetaData object of the database from which the 
-         function is being called. 
 
-        For perfomance, each time this function is called, it saved a copy of the MetaData object in 
-         the cached_database_metas dictionary so that when it's called again for the same database,
-         it will first look in the dictionary and if it found that the MetaDate is already saved
-         there, it will return it directly from there.
+    def meta(self, schema=None):
+        """
+        This function returns an SQLAlchemy database MetaData object of the
+         database from which the function is being called.
+
+        For perfomance, each time this function is called, it saved a copy
+         of the MetaData object in the cached_database_metas dictionary so
+         that when it's called again for the same database, it will first
+         look in the dictionary and if it found that the MetaDate is already
+         saved there, it will return it directly from there.
         """
         db = self.mount()
         metaid = '{0}.{1}'.format(self.pk, schema)
@@ -138,63 +177,73 @@ class Database(models.Model):
             return cached_database_metas[metaid]
         else:
             print('Loading meta data for {0} schema {1}'.format(self, schema))
-            cached_database_metas[metaid] = MetaData(bind=db, reflect=True, schema=schema)
+            cached_database_metas[metaid] = MetaData(
+                bind=db, reflect=True, schema=schema)
             return cached_database_metas[metaid]
-    def get_table(self, table, schema = None):
+
+    def get_table(self, table, schema=None):
         """
-        This function returns an SQLAlchemy Table object for the table identified by.
-         'table', and 'schema' (optional)
+        This function returns an SQLAlchemy Table object for the table
+         identified by 'table', and 'schema' (optional)
         """
         meta = self.meta(schema)
-        if schema != None:
+        if schema is not None:
             table = schema + '.' + table
         if table in meta.tables:
             return meta.tables[table]
         else:
             return None
+
     def clean(self):
         """
-        This function is used to calidate database connection information before saving it.
+        This function is used to calidate database connection information
+         before saving it.
         """
         try:
             self.mount().connect()
         except Exception as e:
-            raise ValidationError('Failed to connect to database: {0}'.format(e))
+            raise ValidationError(
+                'Failed to connect to database: {0}'.format(e))
+
 
 class SourceTable(models.Model):
     """
-    A source table is a table that updates other tables, typically in other databases 
-     when any records of that table are added, removed, or modified.
+    A source table is a table that updates other tables, typically in other
+     databases when any records of that table are added, removed, or modified.
 
-    Any existing database table in any database connected to the PDR server can be
-     added as a SourceTable. Once added, it's being monitored by the PDR server; so that 
-     whenever any changes occur in any record in that table, the PDR server will be notifed
-     in order to update reflections.
+    Any existing database table in any database connected to the PDR server
+     can be added as a SourceTable. Once added, it's being monitored by the
+     PDR server; so that whenever any changes occur in any record in that
+     table, the PDR server will be notifed in order to update reflections.
     """
     source_database = models.ForeignKey(Database, on_delete=models.CASCADE)
     source_table = models.CharField(max_length=200)
     description = models.CharField(max_length=500, blank=True)
+
     def get_table(self):
         """
-        Retrives the SQLAlchemy Table object of the source table from which the function was called.
+        Retrives the SQLAlchemy Table object of the source table from which
+         the function was called.
         """
         path = self.source_table.split('.')
         path.reverse()
         return self.source_database.get_table(*path)
+
     def get_pdr_table(self):
         """
-        Retrives the notification channel Table object (AKA pdr_table) of the source table
-         from which the function was called.
+        Retrives the notification channel Table object (AKA pdr_table) of the
+         source table from which the function was called.
         """
         table_path = self.source_table.split('.')
         if len(table_path) == 1:
             table_path.insert(0, 'None')
         pdr_table_name = '{0}_o_{1}_o_{2}'.format(pdr_prefix, *table_path)
         return self.source_database.get_table(pdr_table_name)
+
     def get_structure(self):
         """
-        Retrives a dict object describing the structure of the source table from which the 
-         function was called.
+        Retrives a dict object describing the structure of the source table
+         from which the function was called.
         """
         ret = {"columns": {}}
         table = self.get_table()
@@ -212,16 +261,23 @@ class SourceTable(models.Model):
             if len(foreign_keys):
                 ret['key'] = foreign_keys[0].column.name
             else:
-                raise ValidationError('Failed to define structure for table {0} because \
-                it has no primary key or even foreign key', table)
+                raise ValidationError(
+                    'Failed to define structure for table {0} because'
+                    + 'it has no primary key or even foreign key',
+                    table
+                )
         return ret
+
     def __str__(self):
         return self.source_database.handle + '.' + self.source_table
+
     def clean(self):
         """
-        This function installs SQL trigger functions and creates a notification channel table in the source
-         database once a new source table is defined. The trigger functions are configured to update 
-         notification channel table (AKA pdr_table) whenever any changes occur in the source table. 
+        This function installs SQL trigger functions and creates a
+         notification channel table in the source database once a new
+         source table is defined. The trigger functions are configured
+         to update notification channel table (AKA pdr_table) whenever
+         any changes occur in the source table.
         """
         from .methods import exec_query
         if not hasattr(self, 'source_database'):
@@ -230,8 +286,12 @@ class SourceTable(models.Model):
             raise ValidationError('Please select source table')
         for bt in SourceTable.objects.all():
             if(str(bt) == str(self)):
-                raise ValidationError('Table \'{0}\' already declared as source table.'.format(str(self)))
-        ### Check if selected table exists in selected database. if not raise ValidationError
+                raise ValidationError(
+                    'Table \'{0}\' already declared as source table.'
+                    .format(str(self))
+                )
+        # Check if selected table exists in selected database. if not
+        # raise ValidationError
         db = self.source_database.mount()
         table_path = self.source_table.split('.')
         if len(table_path) == 1:
@@ -242,7 +302,13 @@ class SourceTable(models.Model):
         else:
             raise ValidationError('Invalid table path')
         try:
-            table_obj = Table(table, MetaData(), autoload=True, autoload_with=db, schema=schema)
+            table_obj = Table(
+                table,
+                MetaData(),
+                autoload=True,
+                autoload_with=db,
+                schema=schema
+            )
         except Exception as e:
             raise ValidationError('Table not found: {0}'.format(e))
         primary_key_columns = table_obj.primary_key.columns.values()
@@ -253,13 +319,16 @@ class SourceTable(models.Model):
             if len(foreign_keys):
                 primaryKey = foreign_keys[0].column
             else:
-                raise ValidationError('Failed to install notification channel on table {0} because \
-                it has no primary key or even foreign key', table)
+                raise ValidationError(
+                    'Failed to install notification channel on table {0}'
+                    + ' because it has no primary key or even foreign key',
+                    table
+                )
         pdr_table_name = '{0}_o_{1}_o_{2}'.format(pdr_prefix, schema, table)
         meta = MetaData()
         pdr_event = Table(
             pdr_table_name, meta,
-            Column('id', Integer, primary_key = True, autoincrement = True),
+            Column('id', Integer, primary_key=True, autoincrement=True),
             Column('c_action', String(6)),
             Column('c_record', primaryKey.type),
             Column('c_time', DateTime, default=datetime.utcnow)
@@ -273,16 +342,22 @@ class SourceTable(models.Model):
             del cached_database_metas[metaid_pdr]
         exec_query(
             db,
-            datasources.__list__[self.source_database.source]['dialect'] + '/create_event_listener',
+            (
+                datasources
+                .__list__
+                [self.source_database.source]['dialect']
+                + '/create_event_listener'
+            ),
             pdr_prefix,
             schema,
             table,
             primaryKey.name
         )
+
     def delete(self):
         """
-        This function is meant to delete the pdr table and the trigger functions that was 
-         initially created by the 'clean()' function.
+        This function is meant to delete the pdr table and the trigger
+         functions that was initially created by the 'clean()' function.
         """
         from .methods import exec_query
         table_path = self.source_table.split('.')
@@ -292,35 +367,88 @@ class SourceTable(models.Model):
         elif len(table_path) == 2:
             schema, table = table_path
         db = self.source_database.mount()
-        ### try to remove event listeners from the databases table. If failed, raise ValidationError
+        # try to remove event listeners from the databases table.
+        # If failed, raise ValidationError
         exec_query(
             db,
-            datasources.__list__[self.source_database.source]['dialect'] + '/delete_event_listener',
+            (
+                datasources
+                .__list__
+                [self.source_database.source]['dialect']
+                + '/delete_event_listener'
+            ),
             pdr_prefix,
             schema,
             table
         )
         super(SourceTable, self).delete()
 
+
 class Reflection(models.Model):
     description = models.CharField(max_length=500)
-    source_table = models.ForeignKey(SourceTable, on_delete=models.CASCADE)       # The source table
-    destination_database = models.ForeignKey(Database, on_delete=models.CASCADE)        # The destination datastorage
+    source_table = models.ForeignKey(  # The source table
+        SourceTable,
+        on_delete=models.CASCADE
+    )
+    destination_database = models.ForeignKey(  # The destination datastorage
+        Database,
+        on_delete=models.CASCADE
+    )
     destination_table = models.CharField(max_length=500)
-    last_commit = models.IntegerField(help_text='id of last pdr_event executed', blank=True, null=True)
+    last_commit = models.IntegerField(
+        help_text='id of last pdr_event executed',
+        blank=True,
+        null=True
+    )
     last_updated = models.DateTimeField(blank=True, null=True)
-    active = models.BooleanField('Active', help_text='Means that the reflection will be updated whenever the source table is updated', default=True)
-    ignore_delete_events = models.BooleanField('Ignore Delete Events', help_text='Don\'t delete records in the reflection when they\'re deleted in the source.', default=True)
-    source_fields = models.CharField(help_text='json representation of the structure of the source table (read only)', max_length=10000)
-    destination_fields = models.CharField(help_text='json configuration that represents the translation from source data to destination structure', max_length=10000)
-    reflection_statment = models.CharField(help_text='SQL statment that will be used to input the data into the destination table whenever the source changes', max_length=10000)
+    active = models.BooleanField(
+        'Active',
+        help_text=(
+            'Means that the reflection will be updated whenever'
+            + ' the source table is updated'
+        ),
+        default=True
+    )
+    ignore_delete_events = models.BooleanField(
+        'Ignore Delete Events',
+        help_text=(
+            'Don\'t delete records in the reflection when they\'re'
+            + ' deleted in the source.'
+        ),
+        default=True
+    )
+    source_fields = models.CharField(
+        help_text=(
+            'json representation of the structure of the'
+            + 'source table (read only)'
+        ),
+        max_length=10000
+    )
+    destination_fields = models.CharField(
+        help_text=(
+            'json configuration that represents the translation from'
+            + ' source data to destination structure'
+        ),
+        max_length=10000
+    )
+    reflection_statment = models.CharField(
+        help_text=(
+            'SQL statment that will be used to input the data into the'
+            + ' destination table whenever the source changes'
+        ),
+        max_length=10000
+    )
+
     def get_destination_table(self):
         dest_table_path = self.destination_table.split('.')
         dest_table_path.reverse()
-        destination_table = self.destination_database.get_table(*dest_table_path)
+        destination_table = self.destination_database.get_table(
+            *dest_table_path)
         return destination_table
+
     def get_source_table(self):
         return self.source_table.get_table()
+
     def bulk_upsert(self, lst):
         print(self, 'Saving {0} items'.format(len(lst)))
         destination_dbc = self.destination_database.mount().connect()
@@ -346,10 +474,14 @@ class Reflection(models.Model):
             if len(foreign_keys):
                 source_table_pk = foreign_keys[0].column
             else:
-                raise ValidationError('Failed to replicate data to table {0} because \
-                it has no primary key or even foreign key', source_table)
+                raise ValidationError(
+                    'Failed to replicate data to table {0} because '
+                    + 'it has no primary key or even foreign key',
+                    source_table
+                )
         print(self, 'retriving destination PK')
-        destination_table_pk = destination_table.primary_key.columns.values()[0]
+        destination_table_pk = destination_table.primary_key.columns.values()[
+            0]
         # List missing records
         already_existing_records = []
         print(self, 'listing already existing records')
@@ -359,10 +491,14 @@ class Reflection(models.Model):
             targer_ids = [rec[source_key] for rec in lst]
             ids_to_select = targer_ids.copy()
             while start < len(ids_to_select):
-                print(self, 'listing records from {0}, to {1}'.format(start, start+limit))
+                print(self, 'listing records from {0}, to {1}'.format(
+                    start, start+limit))
                 selected_ids = ids_to_select[start:start+limit]
                 ret = destination_dbc.execute(
-                    select([destination_table.c[destination_key]], destination_table.c[destination_key].in_(selected_ids))
+                    select(
+                        [destination_table.c[destination_key]],
+                        destination_table.c[destination_key].in_(selected_ids)
+                    )
                 ).fetchall()
                 already_existing_records.extend([rec[0] for rec in ret])
                 start += limit
@@ -370,29 +506,40 @@ class Reflection(models.Model):
             targer_ids = [rec[source_table_pk.name] for rec in lst]
             ids_to_select = targer_ids.copy()
             while start < len(ids_to_select):
-                print(self, 'listing records from {0}, to {1}'.format(start, start+limit))
+                print(self, 'listing records from {0}, to {1}'.format(
+                    start, start+limit))
                 selected_ids = ids_to_select[start:start+limit]
                 ret = destination_dbc.execute(
-                    select([destination_table_pk], destination_table_pk.in_(selected_ids))
+                    select([destination_table_pk],
+                           destination_table_pk.in_(selected_ids))
                 ).fetchall()
                 already_existing_records.extend([rec[0] for rec in ret])
                 start += limit
         index_of_already_existing_records = {}
         missing_records = []
-        print(self, '{0} records already exists. Selecting missing records'.format(len(already_existing_records)))
+        print(
+            self,
+            '{0} records already exists. Selecting missing records'
+            .format(
+                len(already_existing_records)
+            )
+        )
         for rec in already_existing_records:
             index_of_already_existing_records[rec] = 'EXISTS'
         for rec in targer_ids:
             if rec not in index_of_already_existing_records:
                 missing_records.append(rec)
-        print(self, '{0} missing records were identified'.format(len(missing_records)))
+        print(self, '{0} missing records were identified'.format(
+            len(missing_records)))
         # Create missing records
         if source_key:
-            insert_data = [{destination_key : item} for item in missing_records]
+            insert_data = [{destination_key: item} for item in missing_records]
         else:
-            insert_data = [{destination_table_pk.name : item} for item in missing_records]
+            insert_data = [{destination_table_pk.name: item}
+                           for item in missing_records]
         if len(missing_records) > 0:
-            print(self, 'Creating {0} missing records'.format(len(missing_records)))
+            print(self, 'Creating {0} missing records'.format(
+                len(missing_records)))
             destination_dbc.execute(destination_table.insert(), insert_data)
         else:
             print(self, 'All recrods already exists. Updating records data')
@@ -402,7 +549,8 @@ class Reflection(models.Model):
             limit = 500
             start = 0
             while start < len(lst):
-                print(self, 'Updating records from {0}, to {1}'.format(start, start+limit))
+                print(self, 'Updating records from {0}, to {1}'.format(
+                    start, start+limit))
                 selected_items = lst[start:start+limit]
                 destination_dbc.execute(
                     text(self.reflection_statment),
@@ -410,11 +558,13 @@ class Reflection(models.Model):
                 )
                 start += limit
         print(self, 'Done Saving')
+
     def bulk_delete(self, lst):
         print(self, 'Deleting {0} items'.format(len(lst)))
         destination_dbc = self.destination_database.mount().connect()
         destination_table = self.get_destination_table()
-        destination_table_pk = destination_table.primary_key.columns.values()[0]
+        destination_table_pk = destination_table.primary_key.columns.values()[
+            0]
         targer_ids = lst
         limit = 500
         start = 0
@@ -425,13 +575,18 @@ class Reflection(models.Model):
             )
             start += limit
         print(self, 'Done Deleting')
+
     def dump(self):
         source_dbc = self.source_table.source_database.mount().connect()
         source_table = self.get_source_table()
         source_pdr_table = self.source_table.get_pdr_table()
-        # Check if we have any pdr events for this source and update "last_commit"
+        # Check if we have any pdr events for this source and
+        # update "last_commit"
         ret = source_dbc.execute(
-            source_pdr_table.select().order_by(desc(source_pdr_table.c.id)).limit(1)
+            source_pdr_table
+            .select()
+            .order_by(desc(source_pdr_table.c.id))
+            .limit(1)
         ).fetchall()
         if len(ret):
             commit = dict(ret[0])
@@ -446,6 +601,7 @@ class Reflection(models.Model):
         if len(data) > 0:
             self.bulk_upsert(data)
         self.save()
+
     def reflect(self):
         self = Reflection.objects.get(pk=self.pk)
         source_dbc = self.source_table.source_database.mount().connect()
@@ -455,7 +611,8 @@ class Reflection(models.Model):
         data_table_pk = data_table.primary_key.columns.values()[0]
         upsert_stmt = pdr_table.select().with_only_columns([
             func.max(pdr_table.c.id).label('{0}_id'.format(pdr_prefix)),
-            func.max(pdr_table.c.c_action).label('{0}_c_action'.format(pdr_prefix)),
+            func.max(pdr_table.c.c_action).label(
+                '{0}_c_action'.format(pdr_prefix)),
             pdr_table.c.c_record.label('{0}_c_record'.format(pdr_prefix)),
             func.max(pdr_table.c.c_time).label('{0}_c_time'.format(pdr_prefix))
         ])
@@ -464,9 +621,13 @@ class Reflection(models.Model):
         upsert_stmt = upsert_stmt.group_by(pdr_table.c.c_record)
         upsert_stmt = upsert_stmt.order_by('{0}_id'.format(pdr_prefix))
         upsert_stmt = alias(upsert_stmt, 'pdr')
-        upsert_stmt = upsert_stmt.join(data_table, upsert_stmt.c['{0}_c_record'.format(pdr_prefix)] == data_table_pk)
+        upsert_stmt = upsert_stmt.join(
+            data_table,
+            upsert_stmt.c['{0}_c_record'.format(pdr_prefix)] == data_table_pk
+        )
         upsert_stmt = select([upsert_stmt])
         ret = source_dbc.execute(upsert_stmt)
+
         def retrive_data_record(commit):
             data_record = commit.copy()
             data_record.pop('{0}_id'.format(pdr_prefix))
@@ -475,10 +636,16 @@ class Reflection(models.Model):
             data_record.pop('{0}_c_time'.format(pdr_prefix))
             return data_record
         commits = [dict(commit) for commit in ret.fetchall()]
-        #if len(commits) > 0:
-            #print(self, '{0} new events detected'.format(len(commits)))
-        upserts = [retrive_data_record(commit) for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] in ['INSERT', 'UPDATE']]
-        deletes = [commit['{0}_c_record'.format(pdr_prefix)] for commit in commits if commit['{0}_c_action'.format(pdr_prefix)] == 'DELETE']
+        upserts = [
+            retrive_data_record(commit) for commit in commits
+            if commit[
+                '{0}_c_action'.format(pdr_prefix)
+            ] in ['INSERT', 'UPDATE']
+        ]
+        deletes = [
+            commit['{0}_c_record'.format(pdr_prefix)] for commit in commits
+            if commit['{0}_c_action'.format(pdr_prefix)] == 'DELETE'
+        ]
         if len(upserts) > 0:
             self.bulk_upsert(upserts)
         if len(deletes) > 0:
@@ -493,8 +660,15 @@ class Reflection(models.Model):
                 timezone=pytz.timezone("UTC")
             )
             self.save()
+
     def __str__(self):
-        return '{0}-->{1}.{2} : {3}'.format(self.source_table,self.destination_database, self.destination_table, self.description)
+        return '{0}-->{1}.{2} : {3}'.format(
+            self.source_table,
+            self.destination_database,
+            self.destination_table,
+            self.description
+        )
+
     def clean(self):
         destTablePath = self.destination_table.split('.')
         destTablePath.reverse()
@@ -505,43 +679,59 @@ class Reflection(models.Model):
             table = destTablePath[0]
             schema = destTablePath[1]
         else:
-            raise ValidationError('Invalid table path: {0}'.format(destTablePath))
+            raise ValidationError(
+                'Invalid table path: {0}'.format(destTablePath))
         try:
             destination_fields = json.loads(self.destination_fields)
         except Exception as e:
-            raise ValidationError('Unable to parse json: {0}'.format(self.destination_fields))
+            raise ValidationError(
+                'Unable to parse json: {0}'.format(self.destination_fields))
         ddb = self.destination_database.mount()
         destinationTable = self.destination_database.get_table(table, schema)
-        if destinationTable != None:
+        if destinationTable is not None:
             # Table already exists, check its compatiblity
             print(self, 'Table {0} already exists'.format(destinationTable))
             pk_name = destinationTable.primary_key.columns.values()[0].name
             if destination_fields['key'] != pk_name:
                 raise ValidationError(
-                    'Table \'{0}\' already exists but its primary key is \'{1}\' rather than \'{2}\''
-                    .format(self.destination_table, pk_name, destination_fields['key'])
+                    'Table \'{0}\' already exists but its primary key is \
+                    \'{1}\' rather than \'{2}\''
+                    .format(
+                        self.destination_table,
+                        pk_name,
+                        destination_fields['key']
+                    )
                 )
             for needed_column in destination_fields['columns']:
                 c_type = destination_fields['columns'][needed_column]
                 if needed_column not in destinationTable.columns:
-                    print(self, 'Adding column {0} to table {1}'.format(needed_column, destinationTable))
+                    print(self, 'Adding column {0} to table {1}'.format(
+                        needed_column, destinationTable))
                     ColumnObj = Column(
-                        needed_column, 
+                        needed_column,
                         StrToColType(c_type),
-                        nullable = True
+                        nullable=True
                     )
                     add_column(ddb, self.destination_table, ColumnObj)
             # Check PK name and type
         else:
             # Table not defined, create table
-            print(self, 'Creating table {0} in database {1}'.format(table, self.destination_database))
+            print(self, 'Creating table {0} in database {1}'.format(
+                table, self.destination_database))
             try:
                 meta = MetaData()
-                tablecolumns = []   
+                tablecolumns = []
                 for col in destination_fields['columns']:
                     ispk = col == destination_fields['key']
                     tablecolumns.append(
-                        Column(col, StrToColType(destination_fields['columns'][col]), nullable = not ispk, primary_key = ispk)
+                        Column(
+                            col,
+                            StrToColType(
+                                destination_fields['columns'][col]
+                            ),
+                            nullable=not ispk,
+                            primary_key=ispk
+                        )
                     )
                 Table(
                     table, meta,
@@ -552,13 +742,16 @@ class Reflection(models.Model):
             except Exception as e:
                 raise ValidationError('Failed to create table: {0}'.format(e))
         # Delete destination schema's meta cache to force reloading new updates
-        del cached_database_metas['{0}.{1}'.format(self.destination_database.pk, schema)]
+        del cached_database_metas['{0}.{1}'.format(
+            self.destination_database.pk, schema)]
         self.save()
         self.dump()
         self.refresh()
+
     def stop(self):
         self.active = False
         self.save()
+
     def reflection_loop(self):
         active = Reflection.objects.get(pk=self.pk).active
         if active:
@@ -573,12 +766,18 @@ class Reflection(models.Model):
             t.start()
         else:
             del pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)]
+
     def start(self):
         self.active = True
         self.save()
+
     def refresh(self):
         active = Reflection.objects.get(pk=self.pk).active
-        if active and 'Reflection_loop_{0}'.format(self.pk) not in pdr_reflection_loops:
+        if(
+            active
+            and
+            'Reflection_loop_{0}'.format(self.pk) not in pdr_reflection_loops
+        ):
             pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)] = True
             t = threading.Timer(1, self.reflection_loop)
             t.daemon = True

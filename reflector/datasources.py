@@ -1,5 +1,6 @@
 import json
 
+
 class datasources:
     """
     The datasources class defines a list of supported RDBMS types
@@ -12,16 +13,16 @@ class datasources:
         (3, "SQLite"),
         (4, "FireBird")
     )
-    POSTGRESQL  = 0
-    MSSQL       = 1
-    MYSQL       = 2
-    SQLIGHT     = 3
-    FIREBIRD    = 4
+    POSTGRESQL = 0
+    MSSQL = 1
+    MYSQL = 2
+    SQLIGHT = 3
+    FIREBIRD = 4
     __list__ = [
         {
-            "name" : "PostgreSQL",
-            "dialect" : "postgresql",
-            "config" : {
+            "name": "PostgreSQL",
+            "dialect": "postgresql",
+            "config": {
                 "dbname": "databasename",
                 "user": "username",
                 "password": "password",
@@ -30,9 +31,9 @@ class datasources:
             }
         },
         {
-            "name" : "Microsoft SQL",
-            "dialect" : "mssql+pymssql",
-            "config" : {
+            "name": "Microsoft SQL",
+            "dialect": "mssql+pymssql",
+            "config": {
                 "dbname": "master",
                 "user": "sa",
                 "password": "",
@@ -41,9 +42,9 @@ class datasources:
             }
         },
         {
-            "name" : "MySQL",
-            "dialect" : "mysql+mysqldb",
-            "config" : {
+            "name": "MySQL",
+            "dialect": "mysql+mysqldb",
+            "config": {
                 "dbname": "master",
                 "user": "root",
                 "password": "password",
@@ -52,16 +53,16 @@ class datasources:
             }
         },
         {
-            "name" : "SQLite",
-            "dialect" : "sqlite+pysqlite",
-            "config" : {
-                "dbfile" : "path/to/database.db"
+            "name": "SQLite",
+            "dialect": "sqlite+pysqlite",
+            "config": {
+                "dbfile": "path/to/database.db"
             }
         },
         {
-            "name" : "FireBird",
-            "dialect" : "firebird+kinterbasdb",
-            "config" : {
+            "name": "FireBird",
+            "dialect": "firebird+kinterbasdb",
+            "config": {
                 "dbname": "databasename",
                 "user": "SYSDBA",
                 "password": "masterkey",
@@ -71,16 +72,19 @@ class datasources:
             }
         },
     ]
+
     @classmethod
-    def config(self, sourceid = -1):
-        """Returns dict default configurations of an RDBMS by providing its id"""
+    def config(self, sourceid=-1):
+        """Returns dict default configurations of an RDBMS by
+        providing its id"""
         if sourceid == -1:
             return self.__list__
         return self.__list__[sourceid]["config"]
+
     @classmethod
-    def json(self, sourceid = -1):
-        """Returns json default configurations of an RDBMS by providing its id"""
+    def json(self, sourceid=-1):
+        """Returns json default configurations of an RDBMS by
+        providing its id"""
         if sourceid == -1:
             return json.dumps(self.__list__, indent=2)
         return json.dumps(self.__list__[sourceid]["config"], indent=2)
-
