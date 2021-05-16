@@ -18,6 +18,36 @@ cached_database_metas = {}
 database_engines = {}
 
 
+def get_table_key(table, obj=False):
+    """
+    This function takes an SQLAlchemy table object and returns its
+    primary key, or if the table has no primary key, it returns its
+    first foreign key. Otherwise, it raises a ValidationError
+
+    @param table: An SQLAlchemy table object
+    @param obj: boolean of whether the function is expected to return
+     an SQLAlchemy Column object. Otherwise, it returns a string, the
+     column name.
+    @return: Returns either a the SQLAlchemy Column object or the
+    column name of the key column of the provided table.
+    """
+    primary_key_columns = table.primary_key.columns.values()
+    if len(primary_key_columns):
+        key = primary_key_columns[0]
+    else:
+        foreign_keys = list(table.foreign_keys)
+        if len(foreign_keys):
+            key = foreign_keys[0].column
+        else:
+            raise ValidationError(
+                'Table {0} has primary key or even foreign key'
+                .format(table)
+            )
+    if obj:
+        return key
+    return key.name
+
+
 def add_column(engine, table_name, column):
     """
     This function is used to add a new field to an already
@@ -257,19 +287,7 @@ class SourceTable(models.Model):
             else:
                 c_type = None
             ret['columns'][column.name] = c_type
-        primary_key_columns = table.primary_key.columns.values()
-        if len(primary_key_columns):
-            ret['key'] = primary_key_columns[0].name
-        else:
-            foreign_keys = list(table.foreign_keys)
-            if len(foreign_keys):
-                ret['key'] = foreign_keys[0].column.name
-            else:
-                raise ValidationError(
-                    'Failed to define structure for table {0} because'
-                    + 'it has no primary key or even foreign key',
-                    table
-                )
+        ret['key'] = get_table_key(table)
         return ret
 
     def __str__(self):
@@ -315,26 +333,14 @@ class SourceTable(models.Model):
             )
         except Exception as e:
             raise ValidationError('Table not found: {0}'.format(e))
-        primary_key_columns = table_obj.primary_key.columns.values()
-        if len(primary_key_columns):
-            primaryKey = primary_key_columns[0]
-        else:
-            foreign_keys = list(table_obj.foreign_keys)
-            if len(foreign_keys):
-                primaryKey = foreign_keys[0].column
-            else:
-                raise ValidationError(
-                    'Failed to install notification channel on table {0}\
-                     because it has no primary key or even foreign key'
-                    .format(table)
-                )
+        key = get_table_key(table_obj, obj=True)
         pdr_table_name = '{0}_o_{1}_o_{2}'.format(pdr_prefix, schema, table)
         meta = MetaData()
         pdr_event = Table(
             pdr_table_name, meta,
             Column('id', Integer, primary_key=True, autoincrement=True),
             Column('c_action', String(6)),
-            Column('c_record', primaryKey.type),
+            Column('c_record', key.type),
             Column('c_time', DateTime, default=datetime.utcnow)
         )
         meta.create_all(db)
@@ -355,7 +361,7 @@ class SourceTable(models.Model):
             pdr_prefix,
             schema,
             table,
-            primaryKey.name
+            key.name
         )
 
     def delete(self):
@@ -473,22 +479,9 @@ class Reflection(models.Model):
         logging.debug('{0} retriving source table'.format(self))
         source_table = self.get_source_table()
         logging.debug('{0} retriving source PK'.format(self))
-        source_primary_key_columns = source_table.primary_key.columns.values()
-        if len(source_primary_key_columns):
-            source_table_pk = source_primary_key_columns[0]
-        else:
-            foreign_keys = list(source_table.foreign_keys)
-            if len(foreign_keys):
-                source_table_pk = foreign_keys[0].column
-            else:
-                raise ValidationError(
-                    'Failed to replicate data to table {0} because '
-                    + 'it has no primary key or even foreign key',
-                    source_table
-                )
+        source_table_key = get_table_key(source_table, obj=True)
         logging.debug('{0} retriving destination PK'.format(self))
-        destination_table_pk = destination_table.primary_key.columns.values()[
-            0]
+        destination_table_key = get_table_key(destination_table)
         # List missing records
         already_existing_records = []
         logging.debug('{0} listing already existing records'.format(self))
@@ -513,7 +506,7 @@ class Reflection(models.Model):
                 already_existing_records.extend([rec[0] for rec in ret])
                 start += limit
         else:
-            targer_ids = [rec[source_table_pk.name] for rec in lst]
+            targer_ids = [rec[source_table_key.name] for rec in lst]
             ids_to_select = targer_ids.copy()
             while start < len(ids_to_select):
                 logging.debug('{0} listing records from {1}, to {2}'.format(
@@ -523,8 +516,8 @@ class Reflection(models.Model):
                 ))
                 selected_ids = ids_to_select[start:start+limit]
                 ret = destination_dbc.execute(
-                    select([destination_table_pk],
-                           destination_table_pk.in_(selected_ids))
+                    select([destination_table_key],
+                           destination_table_key.in_(selected_ids))
                 ).fetchall()
                 already_existing_records.extend([rec[0] for rec in ret])
                 start += limit
@@ -550,7 +543,7 @@ class Reflection(models.Model):
         if source_key:
             insert_data = [{destination_key: item} for item in missing_records]
         else:
-            insert_data = [{destination_table_pk.name: item}
+            insert_data = [{destination_table_key.name: item}
                            for item in missing_records]
         if len(missing_records) > 0:
             logging.debug(
@@ -591,15 +584,14 @@ class Reflection(models.Model):
         )
         destination_dbc = self.destination_database.mount().connect()
         destination_table = self.get_destination_table()
-        destination_table_pk = \
-            destination_table.primary_key.columns.values()[0]
+        destination_table_key = get_table_key(destination_table, obj=True)
         targer_ids = lst
         limit = 500
         start = 0
         while start < len(lst):
             targer_ids = lst[start:start+limit]
             destination_dbc.execute(
-                destination_table.delete(destination_table_pk.in_(targer_ids))
+                destination_table.delete(destination_table_key.in_(targer_ids))
             )
             start += limit
         logging.debug('Done Deleting'.format(self))
@@ -636,7 +628,7 @@ class Reflection(models.Model):
         # Read SourceTable's latest pdr_events
         pdr_table = self.source_table.get_pdr_table()
         data_table = self.source_table.get_table()
-        data_table_pk = data_table.primary_key.columns.values()[0]
+        data_table_key = get_table_key(data_table, obj=True)
         upsert_stmt = pdr_table.select().with_only_columns([
             func.max(pdr_table.c.id).label('{0}_id'.format(pdr_prefix)),
             func.max(pdr_table.c.c_action).label(
@@ -651,7 +643,7 @@ class Reflection(models.Model):
         upsert_stmt = alias(upsert_stmt, 'pdr')
         upsert_stmt = upsert_stmt.join(
             data_table,
-            upsert_stmt.c['{0}_c_record'.format(pdr_prefix)] == data_table_pk
+            upsert_stmt.c['{0}_c_record'.format(pdr_prefix)] == data_table_key
         )
         upsert_stmt = select([upsert_stmt])
         ret = source_dbc.execute(upsert_stmt)
@@ -725,14 +717,14 @@ class Reflection(models.Model):
                 '{0} Table {1} already exists'
                 .format(self, destinationTable)
             )
-            pk_name = destinationTable.primary_key.columns.values()[0].name
-            if destination_fields['key'] != pk_name:
+            key_name = get_table_key(destinationTable)
+            if destination_fields['key'] != key_name:
                 raise ValidationError(
                     'Table \'{0}\' already exists but its primary key is \
                     \'{1}\' rather than \'{2}\''
                     .format(
                         self.destination_table,
-                        pk_name,
+                        key_name,
                         destination_fields['key']
                     )
                 )
