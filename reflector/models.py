@@ -324,9 +324,9 @@ class SourceTable(models.Model):
                 primaryKey = foreign_keys[0].column
             else:
                 raise ValidationError(
-                    'Failed to install notification channel on table {0}'
-                    + ' because it has no primary key or even foreign key',
-                    table
+                    'Failed to install notification channel on table {0}\
+                     because it has no primary key or even foreign key'
+                    .format(table)
                 )
         pdr_table_name = '{0}_o_{1}_o_{2}'.format(pdr_prefix, schema, table)
         meta = MetaData()

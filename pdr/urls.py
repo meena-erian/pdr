@@ -23,13 +23,13 @@ admin.site.index_title = "Welcome to Pantograph Database Replicator Portal"
 
 urlpatterns = [
     # Set Admin side on the home page.
-    path('', admin.site.urls), 
+    path('', admin.site.urls),
     # An api that returns a list of default database configurations.
-    path('api/db/config', views.db_config), 
-    # An api that takes the id or the slug of a database and 
+    path('api/db/config', views.db_config),
+    # An api that takes the id or the slug of a database and
     # returns a list of all tables in that database.
     path('api/db/<slug:dbIdOrHandle>/tables', views.db_tables),
-    # An api that takes the id or slug of a sourec table and 
+    # An api that takes the id or slug of a sourec table and
     # returns the structure of that table.
     path('api/source/<slug:btID>/fields', views.table_fields)
 ]
