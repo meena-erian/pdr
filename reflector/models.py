@@ -10,6 +10,7 @@ import json
 import threading
 import pytz
 import pgcrypto
+import logging
 
 pdr_prefix = 'pdr_event'
 pdr_reflection_loops = {}
@@ -176,7 +177,10 @@ class Database(models.Model):
         if metaid in cached_database_metas:
             return cached_database_metas[metaid]
         else:
-            print('Loading meta data for {0} schema {1}'.format(self, schema))
+            logging.debug(
+                'Loading meta data for {0} schema {1}'
+                .format(self, schema)
+            )
             cached_database_metas[metaid] = MetaData(
                 bind=db, reflect=True, schema=schema)
             return cached_database_metas[metaid]
@@ -450,11 +454,14 @@ class Reflection(models.Model):
         return self.source_table.get_table()
 
     def bulk_upsert(self, lst):
-        print(self, 'Saving {0} items'.format(len(lst)))
+        logging.debug(
+            '{0} Saving {1} items'
+            .format(self, len(lst))
+        )
         destination_dbc = self.destination_database.mount().connect()
-        print(self, 'retriving destination table')
+        logging.debug('{0} retriving destination table'.format(self))
         destination_table = self.get_destination_table()
-        print(self, 'retriving json config')
+        logging.debug('{0} retriving json config'.format(self))
         json_config = json.loads(self.destination_fields)
         if "key_binding" in json_config:
             for key in json_config["key_binding"]:
@@ -463,9 +470,9 @@ class Reflection(models.Model):
         else:
             source_key = None
             destination_key = None
-        print(self, 'retriving source table')
+        logging.debug('{0} retriving source table'.format(self))
         source_table = self.get_source_table()
-        print(self, 'retriving source PK')
+        logging.debug('{0} retriving source PK'.format(self))
         source_primary_key_columns = source_table.primary_key.columns.values()
         if len(source_primary_key_columns):
             source_table_pk = source_primary_key_columns[0]
@@ -479,20 +486,23 @@ class Reflection(models.Model):
                     + 'it has no primary key or even foreign key',
                     source_table
                 )
-        print(self, 'retriving destination PK')
+        logging.debug('{0} retriving destination PK'.format(self))
         destination_table_pk = destination_table.primary_key.columns.values()[
             0]
         # List missing records
         already_existing_records = []
-        print(self, 'listing already existing records')
+        logging.debug('{0} listing already existing records'.format(self))
         limit = 500
         start = 0
         if source_key:
             targer_ids = [rec[source_key] for rec in lst]
             ids_to_select = targer_ids.copy()
             while start < len(ids_to_select):
-                print(self, 'listing records from {0}, to {1}'.format(
-                    start, start+limit))
+                logging.debug('{0} listing records from {1}, to {2}'.format(
+                    self,
+                    start,
+                    start+limit
+                ))
                 selected_ids = ids_to_select[start:start+limit]
                 ret = destination_dbc.execute(
                     select(
@@ -506,8 +516,11 @@ class Reflection(models.Model):
             targer_ids = [rec[source_table_pk.name] for rec in lst]
             ids_to_select = targer_ids.copy()
             while start < len(ids_to_select):
-                print(self, 'listing records from {0}, to {1}'.format(
-                    start, start+limit))
+                logging.debug('{0} listing records from {1}, to {2}'.format(
+                    self,
+                    start,
+                    start+limit
+                ))
                 selected_ids = ids_to_select[start:start+limit]
                 ret = destination_dbc.execute(
                     select([destination_table_pk],
@@ -517,10 +530,10 @@ class Reflection(models.Model):
                 start += limit
         index_of_already_existing_records = {}
         missing_records = []
-        print(
-            self,
-            '{0} records already exists. Selecting missing records'
+        logging.debug(
+            '{0} {1} records already exists. Selecting missing records'
             .format(
+                self,
                 len(already_existing_records)
             )
         )
@@ -529,8 +542,10 @@ class Reflection(models.Model):
         for rec in targer_ids:
             if rec not in index_of_already_existing_records:
                 missing_records.append(rec)
-        print(self, '{0} missing records were identified'.format(
-            len(missing_records)))
+        logging.debug(
+            '{0} {1} missing records were identified'
+            .format(self, len(missing_records))
+        )
         # Create missing records
         if source_key:
             insert_data = [{destination_key: item} for item in missing_records]
@@ -538,33 +553,46 @@ class Reflection(models.Model):
             insert_data = [{destination_table_pk.name: item}
                            for item in missing_records]
         if len(missing_records) > 0:
-            print(self, 'Creating {0} missing records'.format(
-                len(missing_records)))
+            logging.debug(
+                '{0} Creating {1} missing records'
+                .format(self, len(missing_records))
+            )
             destination_dbc.execute(destination_table.insert(), insert_data)
         else:
-            print(self, 'All recrods already exists. Updating records data')
+            logging.debug(
+                '{0} All recrods already exists. Updating records data'
+                .format(self)
+            )
         # run update statments for each record
         if len(lst) > 0:
-            print(self, 'Updating data for {0} records'.format(len(lst)))
+            logging.debug(
+                '{0} Updating data for {1} records'
+                .format(self, len(lst))
+            )
             limit = 500
             start = 0
             while start < len(lst):
-                print(self, 'Updating records from {0}, to {1}'.format(
-                    start, start+limit))
+                logging.debug(
+                    '{0} Updating records from {1}, to {2}'
+                    .format(self, start, start+limit)
+                )
                 selected_items = lst[start:start+limit]
                 destination_dbc.execute(
                     text(self.reflection_statment),
                     selected_items
                 )
                 start += limit
-        print(self, 'Done Saving')
+        logging.debug('Done Saving'.format(self))
 
     def bulk_delete(self, lst):
-        print(self, 'Deleting {0} items'.format(len(lst)))
+        logging.debug(
+            '{0} Deleting {1} items'
+            .format(self, len(lst))
+        )
         destination_dbc = self.destination_database.mount().connect()
         destination_table = self.get_destination_table()
-        destination_table_pk = destination_table.primary_key.columns.values()[
-            0]
+        destination_table_pk = \
+            destination_table.primary_key.columns.values()[0]
         targer_ids = lst
         limit = 500
         start = 0
@@ -574,7 +602,7 @@ class Reflection(models.Model):
                 destination_table.delete(destination_table_pk.in_(targer_ids))
             )
             start += limit
-        print(self, 'Done Deleting')
+        logging.debug('Done Deleting'.format(self))
 
     def dump(self):
         source_dbc = self.source_table.source_database.mount().connect()
@@ -650,7 +678,10 @@ class Reflection(models.Model):
             self.bulk_upsert(upserts)
         if len(deletes) > 0:
             if self.ignore_delete_events:
-                print(self, 'Ignoring {0} delete events'.format())
+                logging.debug(
+                    '{0} Ignoring {1} delete events'
+                    .format(self, len(deletes))
+                )
             else:
                 self.bulk_delete(deletes)
         if len(commits) > 0:
@@ -690,7 +721,10 @@ class Reflection(models.Model):
         destinationTable = self.destination_database.get_table(table, schema)
         if destinationTable is not None:
             # Table already exists, check its compatiblity
-            print(self, 'Table {0} already exists'.format(destinationTable))
+            logging.info(
+                '{0} Table {1} already exists'
+                .format(self, destinationTable)
+            )
             pk_name = destinationTable.primary_key.columns.values()[0].name
             if destination_fields['key'] != pk_name:
                 raise ValidationError(
@@ -705,8 +739,10 @@ class Reflection(models.Model):
             for needed_column in destination_fields['columns']:
                 c_type = destination_fields['columns'][needed_column]
                 if needed_column not in destinationTable.columns:
-                    print(self, 'Adding column {0} to table {1}'.format(
-                        needed_column, destinationTable))
+                    logging.info(
+                        '{0} Adding column {1} to table {2}'
+                        .format(self, needed_column, destinationTable)
+                    )
                     ColumnObj = Column(
                         needed_column,
                         StrToColType(c_type),
@@ -716,8 +752,10 @@ class Reflection(models.Model):
             # Check PK name and type
         else:
             # Table not defined, create table
-            print(self, 'Creating table {0} in database {1}'.format(
-                table, self.destination_database))
+            logging.info(
+                '{0} Creating table {1} in database {2}'
+                .format(self, table, self.destination_database)
+            )
             try:
                 meta = MetaData()
                 tablecolumns = []
@@ -759,8 +797,10 @@ class Reflection(models.Model):
             try:
                 self.reflect()
             except Exception as e:
-                print('Failed to perform reflection ', self)
-                print(e)
+                logging.error(
+                    'Failed to perform reflection {0}\n{1}'
+                    .format(self, e)
+                )
             t = threading.Timer(WAIT_SECONDS, self.reflection_loop)
             t.daemon = True
             t.start()

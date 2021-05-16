@@ -3,6 +3,7 @@ from django.http import HttpResponse
 from .models import Database, SourceTable, Reflection
 import json
 from django.contrib.admin.views.decorators import staff_member_required
+import logging
 
 
 @staff_member_required
@@ -44,4 +45,4 @@ try:
     for reflection in Reflection.objects.all():
         reflection.refresh()
 except Exception as e:
-    print('Cannot start reflections:', e)
+    logging.error('Cannot start reflections:{0}'.format(e))
