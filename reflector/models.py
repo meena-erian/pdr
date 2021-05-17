@@ -459,6 +459,27 @@ class Reflection(models.Model):
     def get_source_table(self):
         return self.source_table.get_table()
 
+    def get_destination_structure(self):
+        return json.loads(self.destination_fields)
+
+    def get_source_structure(self):
+        return json.loads(self.source_fields)
+
+    def get_destination_key(self):
+        destination_table = self.get_destination_table()
+        destination_structure = self.get_destination_structure()
+        key_binding = destination_structure['key_binding']
+        source_key_name = list(key_binding.keys())[0]
+        destination_key_name = key_binding[source_key_name]
+        return destination_table.c[destination_key_name]
+
+    def get_source_key(self):
+        source_table = self.get_source_table()
+        destination_structure = self.get_destination_structure()
+        key_binding = destination_structure['key_binding']
+        source_key_name = list(key_binding.keys())[0]
+        return source_table.c[source_key_name]
+
     def bulk_upsert(self, lst):
         logging.debug(
             '{0} Saving {1} items'
@@ -623,9 +644,18 @@ class Reflection(models.Model):
         self.save()
 
     def reflect(self):
+        logging.debug('{0}: Reflecting changes'.format(self))
         self = Reflection.objects.get(pk=self.pk)
+        logging.debug(
+            '{0}: Connecting to source database to perform reflection'
+            .format(self)
+        )
         source_dbc = self.source_table.source_database.mount().connect()
         # Read SourceTable's latest pdr_events
+        logging.debug(
+            '{0}: Retriving tables meta information to perform reflection'
+            .format(self)
+        )
         pdr_table = self.source_table.get_pdr_table()
         data_table = self.source_table.get_table()
         data_table_key = get_table_key(data_table, obj=True)
@@ -643,7 +673,8 @@ class Reflection(models.Model):
         upsert_stmt = alias(upsert_stmt, 'pdr')
         upsert_stmt = upsert_stmt.join(
             data_table,
-            upsert_stmt.c['{0}_c_record'.format(pdr_prefix)] == data_table_key
+            upsert_stmt.c['{0}_c_record'.format(pdr_prefix)]
+            == self.get_source_key()
         )
         upsert_stmt = select([upsert_stmt])
         ret = source_dbc.execute(upsert_stmt)
