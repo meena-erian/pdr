@@ -171,7 +171,7 @@ class Database(models.Model):
                 connectionStr += str(config["port"])
             connectionStr += "/" + config["dbname"]
         database_engines[str(self.pk)] = create_engine(
-            connectionStr, echo=False)
+            connectionStr, echo=False, pool_size=20, max_overflow=0)
         return database_engines[str(self.pk)]
 
     def tables(self):
@@ -468,16 +468,13 @@ class Reflection(models.Model):
     def get_destination_key(self):
         destination_table = self.get_destination_table()
         destination_structure = self.get_destination_structure()
-        key_binding = destination_structure['key_binding']
-        source_key_name = list(key_binding.keys())[0]
-        destination_key_name = key_binding[source_key_name]
+        destination_key_name = destination_structure['key']
         return destination_table.c[destination_key_name]
 
     def get_source_key(self):
         source_table = self.get_source_table()
-        destination_structure = self.get_destination_structure()
-        key_binding = destination_structure['key_binding']
-        source_key_name = list(key_binding.keys())[0]
+        source_structure = self.get_source_structure()
+        source_key_name = source_structure['key']
         return source_table.c[source_key_name]
 
     def bulk_upsert(self, lst):
