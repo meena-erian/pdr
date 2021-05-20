@@ -28,10 +28,10 @@ def get_table_key(table, obj=False):
     first foreign key. Otherwise, it raises a ValidationError
 
     @param table: An SQLAlchemy table object
-    @param obj: boolean of whether the function is expected to return
+    @param obj: boolean, of whether the function is expected to return
      an SQLAlchemy Column object. Otherwise, it returns a string, the
      column name.
-    @return: Returns either a the SQLAlchemy Column object or the
+    @return: Returns either the SQLAlchemy Column object or the
     column name of the key column of the provided table.
     """
     primary_key_columns = table.primary_key.columns.values()
@@ -55,6 +55,11 @@ def add_column(engine, table_name, column):
     """
     This function is used to add a new field to an already
     existing table in a database.
+
+    @param engine SQLAlchemy database engine object
+    @param table_name str, full path.name of the target table
+    @param column SQLAlchemy Column object that will be added
+    @returns No return value
     """
     column_name = column.compile(dialect=engine.dialect)
     column_type = column.type.compile(engine.dialect)
@@ -71,6 +76,9 @@ def typeFullName(o):
     """
     This function takes any user defined object or class of any type and
     returns a string absolute identifier of the provided type.
+
+    @param o: object of any type to be inspected
+    @returns: str The full path of the provided type
     """
     module = o.__class__.__module__
     if module is None or module == str.__class__.__module__:
@@ -86,6 +94,9 @@ def ColTypeToStr(Type):
     SQLAlchemy column type.
 
     This function is the inverse of the function StrToColType.
+
+    @param Type: SQLAlchemy Column type
+    @returns: str, String uniquely identifying the provided Column type
     """
     instanceClassName = typeFullName(Type)
     mainParent, path = instanceClassName.split('.', 1)
@@ -102,6 +113,9 @@ def StrToColType(TypePath):
     and returns an SQLAlchemy type definition class of the provided type.
 
     This function is the inverse of the function ColTypeToStr.
+
+    @param TypePath: str, The string identifier of an SQLAlchemy column type.
+    @returns: class, the SQLAlchemy column class of the provided string.
     """
     import sqlalchemy
     pathentries = TypePath.split('.')
