@@ -11,11 +11,14 @@ import threading
 import pytz
 import pgcrypto
 import logging
+import sys
 
 pdr_prefix = 'pdr_event'
 pdr_reflection_loops = {}
 cached_database_metas = {}
 database_engines = {}
+
+# logging.basicConfig(level=logging.DEBUG)
 
 
 def get_table_key(table, obj=False):
@@ -171,7 +174,11 @@ class Database(models.Model):
                 connectionStr += str(config["port"])
             connectionStr += "/" + config["dbname"]
         database_engines[str(self.pk)] = create_engine(
-            connectionStr, echo=False, pool_size=20, max_overflow=0)
+            connectionStr,
+            echo=False,
+            pool_size=500,
+            max_overflow=0
+        )
         return database_engines[str(self.pk)]
 
     def tables(self):
@@ -180,16 +187,16 @@ class Database(models.Model):
          the function is being called.
         """
         from .methods import make_query
-        engine = self.mount().connect()
-        results = []
-        if self.source == datasources.SQLIGHT:
-            ret = engine.execute(make_query(datasources.__list__[
-                                 self.source]['dialect'] + '/list_tables'))
-        else:
-            ret = engine.execute(make_query('list_tables'))
-        for record in ret:
-            results.append(record[0])
-        return results
+        with self.mount().connect() as connection:
+            results = []
+            if self.source == datasources.SQLIGHT:
+                ret = connection.execute(make_query(datasources.__list__[
+                                    self.source]['dialect'] + '/list_tables'))
+            else:
+                ret = connection.execute(make_query('list_tables'))
+            for record in ret:
+                results.append(record[0])
+            return results
 
     def meta(self, schema=None):
         """
@@ -234,7 +241,8 @@ class Database(models.Model):
          before saving it.
         """
         try:
-            self.mount().connect()
+            with self.mount().connect() as connection:
+                None  # Just testing the connection
         except Exception as e:
             raise ValidationError(
                 'Failed to connect to database: {0}'.format(e))
@@ -482,7 +490,7 @@ class Reflection(models.Model):
             '{0} Saving {1} items'
             .format(self, len(lst))
         )
-        destination_dbc = self.destination_database.mount().connect()
+        destination_db_engine = self.destination_database.mount()
         logging.debug('{0} retriving destination table'.format(self))
         destination_table = self.get_destination_table()
         logging.debug('{0} retriving json config'.format(self))
@@ -515,12 +523,14 @@ class Reflection(models.Model):
                     start+limit
                 ))
                 selected_ids = ids_to_select[start:start+limit]
-                ret = destination_dbc.execute(
-                    select(
-                        [destination_table.c[destination_key]],
-                        destination_table.c[destination_key].in_(selected_ids)
-                    )
-                ).fetchall()
+                with destination_db_engine.connect() as destination_dbc:
+                    ret = destination_dbc.execute(
+                        select(
+                            [destination_table.c[destination_key]],
+                            destination_table.c[destination_key]
+                            .in_(selected_ids)
+                        )
+                    ).fetchall()
                 already_existing_records.extend([rec[0] for rec in ret])
                 start += limit
         else:
@@ -533,10 +543,14 @@ class Reflection(models.Model):
                     start+limit
                 ))
                 selected_ids = ids_to_select[start:start+limit]
-                ret = destination_dbc.execute(
-                    select([destination_table_key],
-                           destination_table_key.in_(selected_ids))
-                ).fetchall()
+                with destination_db_engine.connect() as destination_dbc:
+                    ret = destination_dbc.execute(
+                        select(
+                            [destination_table_key],
+                            destination_table_key
+                            .in_(selected_ids)
+                        )
+                    ).fetchall()
                 already_existing_records.extend([rec[0] for rec in ret])
                 start += limit
         index_of_already_existing_records = {}
@@ -568,7 +582,11 @@ class Reflection(models.Model):
                 '{0} Creating {1} missing records'
                 .format(self, len(missing_records))
             )
-            destination_dbc.execute(destination_table.insert(), insert_data)
+            with destination_db_engine.connect() as destination_dbc:
+                destination_dbc.execute(
+                    destination_table.insert(),
+                    insert_data
+                )
         else:
             logging.debug(
                 '{0} All recrods already exists. Updating records data'
@@ -588,10 +606,11 @@ class Reflection(models.Model):
                     .format(self, start, start+limit)
                 )
                 selected_items = lst[start:start+limit]
-                destination_dbc.execute(
-                    text(self.reflection_statment),
-                    selected_items
-                )
+                with destination_db_engine.connect() as destination_dbc:
+                    destination_dbc.execute(
+                        text(self.reflection_statment),
+                        selected_items
+                    )
                 start += limit
         logging.debug('Done Saving'.format(self))
 
@@ -600,41 +619,44 @@ class Reflection(models.Model):
             '{0} Deleting {1} items'
             .format(self, len(lst))
         )
-        destination_dbc = self.destination_database.mount().connect()
         destination_table = self.get_destination_table()
         destination_table_key = get_table_key(destination_table, obj=True)
         targer_ids = lst
         limit = 500
         start = 0
-        while start < len(lst):
-            targer_ids = lst[start:start+limit]
-            destination_dbc.execute(
-                destination_table.delete(destination_table_key.in_(targer_ids))
-            )
-            start += limit
+        with self.destination_database.mount().connect() as destination_dbc:
+            while start < len(lst):
+                targer_ids = lst[start:start+limit]
+                destination_dbc.execute(
+                    destination_table.delete(
+                        destination_table_key
+                        .in_(targer_ids)
+                    )
+                )
+                start += limit
         logging.debug('Done Deleting'.format(self))
 
     def dump(self):
-        source_dbc = self.source_table.source_database.mount().connect()
-        source_table = self.get_source_table()
-        source_pdr_table = self.source_table.get_pdr_table()
-        # Check if we have any pdr events for this source and
-        # update "last_commit"
-        ret = source_dbc.execute(
-            source_pdr_table
-            .select()
-            .order_by(desc(source_pdr_table.c.id))
-            .limit(1)
-        ).fetchall()
-        if len(ret):
-            commit = dict(ret[0])
-            self.last_commit = commit['id']
-            self.last_updated = timezone.make_aware(
-                commit['c_time'],
-                timezone=pytz.timezone("UTC")
-            )
-        # Retrive all existing data and mirror it
-        data = source_dbc.execute(source_table.select()).fetchall()
+        with self.source_table.source_database.mount().connect() as source_dbc:
+            source_table = self.get_source_table()
+            source_pdr_table = self.source_table.get_pdr_table()
+            # Check if we have any pdr events for this source and
+            # update "last_commit"
+            ret = source_dbc.execute(
+                source_pdr_table
+                .select()
+                .order_by(desc(source_pdr_table.c.id))
+                .limit(1)
+            ).fetchall()
+            if len(ret):
+                commit = dict(ret[0])
+                self.last_commit = commit['id']
+                self.last_updated = timezone.make_aware(
+                    commit['c_time'],
+                    timezone=pytz.timezone("UTC")
+                )
+            # Retrive all existing data and mirror it
+            data = source_dbc.execute(source_table.select()).fetchall()
         data = [dict(rec) for rec in data]
         if len(data) > 0:
             self.bulk_upsert(data)
@@ -647,7 +669,6 @@ class Reflection(models.Model):
             '{0}: Connecting to source database to perform reflection'
             .format(self)
         )
-        source_dbc = self.source_table.source_database.mount().connect()
         # Read SourceTable's latest pdr_events
         logging.debug(
             '{0}: Retriving tables meta information to perform reflection'
@@ -674,7 +695,9 @@ class Reflection(models.Model):
             == self.get_source_key()
         )
         upsert_stmt = select([upsert_stmt])
-        ret = source_dbc.execute(upsert_stmt)
+        with self.source_table.source_database.mount().connect() as source_dbc:
+            ret = source_dbc.execute(upsert_stmt)
+            commits = [dict(commit) for commit in ret.fetchall()]
 
         def retrive_data_record(commit):
             data_record = commit.copy()
@@ -683,7 +706,7 @@ class Reflection(models.Model):
             data_record.pop('{0}_c_record'.format(pdr_prefix))
             data_record.pop('{0}_c_time'.format(pdr_prefix))
             return data_record
-        commits = [dict(commit) for commit in ret.fetchall()]
+
         upserts = [
             retrive_data_record(commit) for commit in commits
             if commit[
@@ -711,6 +734,7 @@ class Reflection(models.Model):
                 timezone=pytz.timezone("UTC")
             )
             self.save()
+        return len(commits)
 
     def __str__(self):
         return '{0}-->{1}.{2} : {3}'.format(
@@ -817,9 +841,11 @@ class Reflection(models.Model):
             try:
                 self.reflect()
             except Exception as e:
+                exc_type, exc_obj, exc_tb = sys.exc_info()
                 logging.error(
-                    'Failed to perform reflection {0}\n{1}'
-                    .format(self, e)
+                    'Failed to perform reflection {0}\n\
+                        ErrorType:{1}\nFile:{2}\nLine:{3}\nMessage:{4}'
+                    .format(self, exc_type, exc_obj, exc_tb, e)
                 )
             t = threading.Timer(WAIT_SECONDS, self.reflection_loop)
             t.daemon = True
