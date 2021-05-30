@@ -232,8 +232,8 @@ class Database(models.Model):
                 'Loading meta data for {0} schema {1}'
                 .format(self, schema)
             )
-            cached_database_metas[metaid] = MetaData(
-                bind=db, reflect=True, schema=schema)
+            cached_database_metas[metaid] = MetaData()
+            cached_database_metas[metaid].reflect(bind=db)
             return cached_database_metas[metaid]
 
     def get_table(self, table, schema=None):
@@ -242,6 +242,12 @@ class Database(models.Model):
          identified by 'table', and 'schema' (optional)
         """
         meta = self.meta(schema)
+        if(len(meta.tables.keys()) < 1):
+            raise Exception(
+                'Exception in function Database.get_table. '
+                '{0}.meta() returned an empty structure'
+                .format(self)
+            )
         if schema is not None:
             table = schema + '.' + table
         if table in meta.tables:
@@ -283,7 +289,17 @@ class SourceTable(models.Model):
         """
         path = self.source_table.split('.')
         path.reverse()
-        return self.source_database.get_table(*path)
+        ret = self.source_database.get_table(*path)
+        if type(ret).__name__ != 'Table':
+            raise Exception(
+                'Exception in function SourceTabl.get_table. '
+                ' {0}.get_table({1}) returned {2}'.format(
+                    self.source_database,
+                    path,
+                    ret
+                )
+            )
+        return ret
 
     def get_pdr_table(self):
         """
@@ -303,6 +319,15 @@ class SourceTable(models.Model):
         """
         ret = {"columns": {}}
         table = self.get_table()
+        if type(table).__name__ != 'Table':
+            raise Exception(
+                'Exceeption in function SourceTable. get_structure.'
+                ' {0}.get_table returned type {1}'
+                .format(
+                    self,
+                    type(table).__name__
+                )
+            )
         for column in table.columns:
             if hasattr(column, 'type'):
                 c_type = ColTypeToStr(column.type)
