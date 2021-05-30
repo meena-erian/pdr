@@ -13,6 +13,7 @@ import pgcrypto
 import logging
 import sys
 
+
 pdr_prefix = 'pdr_event'
 pdr_reflection_loops = {}
 cached_database_metas = {}
@@ -170,6 +171,8 @@ class Database(models.Model):
 
         """
         if str(self.pk) in database_engines:
+            # Run garbage collector to dispose old IDLE connections
+            # database_engines[str(self.pk)].dispose()
             return database_engines[str(self.pk)]
         config = json.loads(self.config)
         connectionStr = datasources.__list__[self.source]['dialect'] + '://'
@@ -189,9 +192,7 @@ class Database(models.Model):
             connectionStr += "/" + config["dbname"]
         database_engines[str(self.pk)] = create_engine(
             connectionStr,
-            echo=False,
-            pool_size=500,
-            max_overflow=0
+            echo=False
         )
         return database_engines[str(self.pk)]
 
@@ -702,6 +703,7 @@ class Reflection(models.Model):
         self.save()
 
     def reflect(self):
+        # db.close_old_connections()
         logging.debug('{0}: Reflecting changes'.format(self))
         self = Reflection.objects.get(pk=self.pk)
         logging.debug(
@@ -874,11 +876,22 @@ class Reflection(models.Model):
         self.save()
 
     def reflection_loop(self):
-        active = Reflection.objects.get(pk=self.pk).active
+        WAIT_SECONDS = 5
+
+        try:
+            active = Reflection.objects.get(pk=self.pk).active
+        except Exception as e:
+            t = threading.Timer(WAIT_SECONDS, self.reflection_loop)
+            t.daemon = True
+            t.start()
+            return
         if active:
-            WAIT_SECONDS = 1
             try:
-                self.reflect()
+                reflection_results = self.reflect()
+                logging.info(
+                    'Reflect: {0} returned: {1}'
+                    .format(self, reflection_results)
+                )
             except Exception as e:
                 exc_type, exc_obj, exc_tb = sys.exc_info()
                 logging.error(
@@ -886,11 +899,16 @@ class Reflection(models.Model):
                         ErrorType:{1}\nFile:{2}\nLine:{3}\nMessage:{4}'
                     .format(self, exc_type, exc_obj, exc_tb, e)
                 )
-            t = threading.Timer(WAIT_SECONDS, self.reflection_loop)
-            t.daemon = True
-            t.start()
+            try:
+                t = threading.Timer(WAIT_SECONDS, self.reflection_loop)
+                t.daemon = True
+                t.start()
+            except Exception as e:
+                print("Failed to start new Thread at -----------------L888")
         else:
-            del pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)]
+            ref_key = 'Reflection_loop_{0}'.format(self.pk)
+            if ref_key in pdr_reflection_loops:
+                del pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)]
 
     def start(self):
         self.active = True

@@ -39,10 +39,3 @@ def table_fields(request, btID):
     ret = bt.get_structure()
     return HttpResponse(json.dumps(
         ret, indent=2), content_type="application/json")
-
-
-try:
-    for reflection in Reflection.objects.all():
-        reflection.refresh()
-except Exception as e:
-    logging.error('Cannot start reflections:{0}'.format(e))
