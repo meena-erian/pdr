@@ -9,7 +9,7 @@
   <h3 align="center">Pantograph Database Replicator</h3>
 
   <p align="center">
-    Flexible Database replication system compatible with all SQL databases
+    Flexible Database replication system compatible with most SQL databases
     <br />
     <!--
     <a href=""><strong>Explore the docs »</strong></a>
@@ -33,16 +33,19 @@
     <li>
       <a href="#about-the-project">About The Project</a>
       <ul>
-        <li><a href="#built-with">Built With</a></li>
         <li><a href="#features">Features</a></li>
+        <li><a href="#built-with">Built With</a></li>
       </ul>
     </li>
     <li>
+      <a href="#quick-start">Quick Start</a>
+      <!--
       <a href="#getting-started">Getting Started</a>
       <ul>
         <li><a href="#prerequisites">Prerequisites</a></li>
         <li><a href="#installation">Installation</a></li>
       </ul>
+      -->
     </li>
     <!--<li><a href="#usage">Usage</a></li>-->
     <li><a href="#roadmap">Roadmap</a></li>
@@ -60,12 +63,10 @@
 
 <!-- [![Product Name Screen Shot][product-screenshot]](https://example.com) -->
 
-PDR is a web-service software based on a strategy for establishing a reliable, high-performance, cross-platform, live mirror of any table[s] in an SQL database server to any other SQL database server. 
+PDR is a standalone Django app for establishing a reliable, high-performance, cross-platform, live mirror of any table[s] in an SQL database server to any other SQL database server. 
 <br />
 Pantograph database replication is event driven, not time driven, ie. it doesn’t update the whole mirror database periodically; Instead, it updates each individual group of affected records in the affected table in the mirror at the moment it's modified in the original database. Which results in a more speedy instant update, yet consumes less bandwidth and server resources.
 Pantograph database replication is also perfectly reliable because the server listening for changes doesn’t has to be online at the moment changes occur. Instead, the host server creates notification channels where changes are stacked awaiting the listening server’s action to read notification, and update its replications in remote servers.
-<br />
-Of course, no one template will serve all projects since your needs may be different. So I'll be adding more in the near future. You may also suggest changes by forking this repo and creating a pull request or opening an issue. Thanks to all the people have have contributed to expanding this template!
 <br />
 A list of commonly used resources that I find helpful are listed in the acknowledgements.
 
@@ -78,6 +79,7 @@ A list of commonly used resources that I find helpful are listed in the acknowle
 5. High in performance as it’s event-driven.
 6. One-way data replication can be used to join data from multiple different tables in multiple different databases into one live table.
 7. Provides a simple easy to use GUI to configure replications.
+8. Distributed as a standalone Django app wrapped in a PyPi package so you can easily integrate it with any existing Django Project.
 
 
 ### Built With
@@ -85,7 +87,37 @@ A list of commonly used resources that I find helpful are listed in the acknowle
 The project is based on Django, the popular python framework, SQLAlchemy, A wonderful open-source SQL abstraction layer for the Python programing language, and native SQL trigger functions.
 
 
+## Quick start
+
+
+1. Add "reflector" and "django_ace" to your INSTALLED_APPS setting like this::
+
+```python
+INSTALLED_APPS = [
+    ...
+    'django_ace',
+    'reflector',
+]
+```
+
+2. Include the admin URLs anywhere in your project urls.py like this::
+
+```python
+from django.contrib import admin
+
+urlpatterns = [
+    path('admin/', admin.site.urls),
+]
+```
+
+3. Run  `python manage.py makemigrations`  and then 
+    `python manage.py migrate` to create the reflector models.
+
+4. Start the development server and visit http://127.0.0.1:8000/admin/
+   to setup Databases, SourceTables and then Reflections.
+
 <!-- GETTING STARTED -->
+<!--
 ## Getting Started
 
 In order to install and use Pantograph Database Replicator, first you have to determine a server that can access all source and destination databases. As you will install Pantograph databasae replicator on that server, or if you only want to try it, you can just create multiple SQLite files to use them as your example databases.
