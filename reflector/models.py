@@ -7,15 +7,12 @@ from sqlalchemy.orm import *
 from .datasources import datasources
 import urllib.parse
 import json
-import threading
 import pytz
 import pgcrypto
 import logging
-import sys
 
 
 pdr_prefix = 'pdr_event'
-pdr_reflection_loops = {}
 cached_database_metas = {}
 database_engines = {}
 
@@ -869,59 +866,11 @@ class Reflection(models.Model):
             self.destination_database.pk, schema)]
         self.save()
         self.dump()
-        self.refresh()
 
     def stop(self):
         self.active = False
         self.save()
 
-    def reflection_loop(self):
-        WAIT_SECONDS = 5
-
-        try:
-            active = Reflection.objects.get(pk=self.pk).active
-        except Exception as e:
-            t = threading.Timer(WAIT_SECONDS, self.reflection_loop)
-            t.daemon = True
-            t.start()
-            return
-        if active:
-            try:
-                reflection_results = self.reflect()
-                logging.info(
-                    'Reflect: {0} returned: {1}'
-                    .format(self, reflection_results)
-                )
-            except Exception as e:
-                exc_type, exc_obj, exc_tb = sys.exc_info()
-                logging.error(
-                    'Failed to perform reflection {0}\n\
-                        ErrorType:{1}\nFile:{2}\nLine:{3}\nMessage:{4}'
-                    .format(self, exc_type, exc_obj, exc_tb, e)
-                )
-            try:
-                t = threading.Timer(WAIT_SECONDS, self.reflection_loop)
-                t.daemon = True
-                t.start()
-            except Exception as e:
-                print("Failed to start new Thread at -----------------L888")
-        else:
-            ref_key = 'Reflection_loop_{0}'.format(self.pk)
-            if ref_key in pdr_reflection_loops:
-                del pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)]
-
     def start(self):
         self.active = True
         self.save()
-
-    def refresh(self):
-        active = Reflection.objects.get(pk=self.pk).active
-        if(
-            active
-            and
-            'Reflection_loop_{0}'.format(self.pk) not in pdr_reflection_loops
-        ):
-            pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)] = True
-            t = threading.Timer(1, self.reflection_loop)
-            t.daemon = True
-            t.start()
