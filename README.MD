@@ -116,6 +116,8 @@ urlpatterns = [
 5. Start the development server and visit http://127.0.0.1:8000/admin/
    to setup Databases, SourceTables and then Reflections.
 
+6. In another terminal window, run the command `python manage.py pdr-reflect -i 1` to start the PDR background activity
+
 <!-- GETTING STARTED -->
 <!--
 ## Getting Started
