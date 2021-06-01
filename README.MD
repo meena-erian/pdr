@@ -89,8 +89,9 @@ The project is based on Django, the popular python framework, SQLAlchemy, A wond
 
 ## Quick start
 
+1. Run  `pip install django-pdr` to install Pantograph Database Replicator's python package from the python package index
 
-1. Add "reflector" and "django_ace" to your INSTALLED_APPS setting like this::
+2. Add "reflector" and "django_ace" to your INSTALLED_APPS setting like this:
 
 ```python
 INSTALLED_APPS = [
@@ -100,7 +101,7 @@ INSTALLED_APPS = [
 ]
 ```
 
-2. Include the admin URLs anywhere in your project urls.py like this::
+3. Include the admin URLs anywhere in your project urls.py like this:
 
 ```python
 from django.contrib import admin
@@ -110,10 +111,9 @@ urlpatterns = [
 ]
 ```
 
-3. Run  `python manage.py makemigrations`  and then 
-    `python manage.py migrate` to create the reflector models.
+4. Run `python manage.py migrate` to create the reflector models.
 
-4. Start the development server and visit http://127.0.0.1:8000/admin/
+5. Start the development server and visit http://127.0.0.1:8000/admin/
    to setup Databases, SourceTables and then Reflections.
 
 <!-- GETTING STARTED -->
