@@ -10,6 +10,7 @@ import json
 import pytz
 import pgcrypto
 import logging
+import sys
 
 
 pdr_prefix = 'pdr_event'
