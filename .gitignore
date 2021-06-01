@@ -1,5 +1,8 @@
 *.sqlite3
 static/*
+dist
+django_pdr.egg-info
+build
 **/*.pyc
 **/__pycache__/*
 **/migrations/[0-9]*

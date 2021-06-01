@@ -7,14 +7,12 @@ from sqlalchemy.orm import *
 from .datasources import datasources
 import urllib.parse
 import json
-import threading
 import pytz
 import pgcrypto
 import logging
-import sys
+
 
 pdr_prefix = 'pdr_event'
-pdr_reflection_loops = {}
 cached_database_metas = {}
 database_engines = {}
 
@@ -170,6 +168,8 @@ class Database(models.Model):
 
         """
         if str(self.pk) in database_engines:
+            # Run garbage collector to dispose old IDLE connections
+            # database_engines[str(self.pk)].dispose()
             return database_engines[str(self.pk)]
         config = json.loads(self.config)
         connectionStr = datasources.__list__[self.source]['dialect'] + '://'
@@ -189,9 +189,7 @@ class Database(models.Model):
             connectionStr += "/" + config["dbname"]
         database_engines[str(self.pk)] = create_engine(
             connectionStr,
-            echo=False,
-            pool_size=500,
-            max_overflow=0
+            echo=False
         )
         return database_engines[str(self.pk)]
 
@@ -232,8 +230,8 @@ class Database(models.Model):
                 'Loading meta data for {0} schema {1}'
                 .format(self, schema)
             )
-            cached_database_metas[metaid] = MetaData(
-                bind=db, reflect=True, schema=schema)
+            cached_database_metas[metaid] = MetaData()
+            cached_database_metas[metaid].reflect(bind=db)
             return cached_database_metas[metaid]
 
     def get_table(self, table, schema=None):
@@ -242,6 +240,12 @@ class Database(models.Model):
          identified by 'table', and 'schema' (optional)
         """
         meta = self.meta(schema)
+        if(len(meta.tables.keys()) < 1):
+            raise Exception(
+                'Exception in function Database.get_table. '
+                '{0}.meta() returned an empty structure'
+                .format(self)
+            )
         if schema is not None:
             table = schema + '.' + table
         if table in meta.tables:
@@ -283,7 +287,17 @@ class SourceTable(models.Model):
         """
         path = self.source_table.split('.')
         path.reverse()
-        return self.source_database.get_table(*path)
+        ret = self.source_database.get_table(*path)
+        if type(ret).__name__ != 'Table':
+            raise Exception(
+                'Exception in function SourceTabl.get_table. '
+                ' {0}.get_table({1}) returned {2}'.format(
+                    self.source_database,
+                    path,
+                    ret
+                )
+            )
+        return ret
 
     def get_pdr_table(self):
         """
@@ -303,6 +317,15 @@ class SourceTable(models.Model):
         """
         ret = {"columns": {}}
         table = self.get_table()
+        if type(table).__name__ != 'Table':
+            raise Exception(
+                'Exceeption in function SourceTable. get_structure.'
+                ' {0}.get_table returned type {1}'
+                .format(
+                    self,
+                    type(table).__name__
+                )
+            )
         for column in table.columns:
             if hasattr(column, 'type'):
                 c_type = ColTypeToStr(column.type)
@@ -677,6 +700,7 @@ class Reflection(models.Model):
         self.save()
 
     def reflect(self):
+        # db.close_old_connections()
         logging.debug('{0}: Reflecting changes'.format(self))
         self = Reflection.objects.get(pk=self.pk)
         logging.debug(
@@ -842,43 +866,11 @@ class Reflection(models.Model):
             self.destination_database.pk, schema)]
         self.save()
         self.dump()
-        self.refresh()
 
     def stop(self):
         self.active = False
         self.save()
 
-    def reflection_loop(self):
-        active = Reflection.objects.get(pk=self.pk).active
-        if active:
-            WAIT_SECONDS = 1
-            try:
-                self.reflect()
-            except Exception as e:
-                exc_type, exc_obj, exc_tb = sys.exc_info()
-                logging.error(
-                    'Failed to perform reflection {0}\n\
-                        ErrorType:{1}\nFile:{2}\nLine:{3}\nMessage:{4}'
-                    .format(self, exc_type, exc_obj, exc_tb, e)
-                )
-            t = threading.Timer(WAIT_SECONDS, self.reflection_loop)
-            t.daemon = True
-            t.start()
-        else:
-            del pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)]
-
     def start(self):
         self.active = True
         self.save()
-
-    def refresh(self):
-        active = Reflection.objects.get(pk=self.pk).active
-        if(
-            active
-            and
-            'Reflection_loop_{0}'.format(self.pk) not in pdr_reflection_loops
-        ):
-            pdr_reflection_loops['Reflection_loop_{0}'.format(self.pk)] = True
-            t = threading.Timer(1, self.reflection_loop)
-            t.daemon = True
-            t.start()

@@ -1,0 +1,7 @@
+include LICENSE
+include README.rst
+recursive-include reflector/js *
+recursive-include reflector/management *
+recursive-include reflector/migrations *
+recursive-include reflector/sql *
+recursive-include docs *

@@ -9,7 +9,13 @@
  */
 var source = document.querySelector("#id_source_table");
 if (!source.value) return;
-api = `/api/source/${source.value}/fields`;
+/**
+ * First, lets find the current relative base path of the reflector app
+ *  based on the last index of '/reflector/ in the url.
+ */
+var pureBaseIndex = location.pathname.lastIndexOf('/reflection/');
+var pureBasePath = location.pathname.slice(0, pureBaseIndex);
+var api = `${ pureBasePath }/reflection/${ source.value }/fields`;
 console.log('Fetching: ', api);
 fetch(api).then(function (r) {
     r.json().then(function (j) {

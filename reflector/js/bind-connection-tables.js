@@ -10,7 +10,13 @@
  */
 var connectionSelect = this;
 if (!connectionSelect.value) return;
-api = `/api/db/${this.value}/tables`;
+/**
+ * First, lets find the current relative base path of the reflector app
+ *  based on the last index of '/reflector/ in the url.
+ */
+var pureBaseIndex = location.pathname.lastIndexOf('/reflection/');
+var pureBasePath = location.pathname.slice(0, pureBaseIndex);
+var api = `${ pureBasePath }/sourcetable/${ this.value }/tables`;
 fetch(api).then(function (r) {
     r.json().then(function (tables) {
         var tableSelect = document.querySelector(`#{0}`);

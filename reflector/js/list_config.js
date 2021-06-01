@@ -8,7 +8,13 @@
  */
 var source = document.querySelector("#id_source");
 if (!source.value) return;
-api = `/api/db/config`;
+/**
+ * First, lets find the current relative base path of the reflector app
+ *  based on the last index of '/reflector/ in the url.
+ */
+var pureBaseIndex = location.pathname.lastIndexOf('/database/');
+var pureBasePath = location.pathname.slice(0, pureBaseIndex);
+var api = `${ pureBasePath }/database/config`;
 console.log('Fetching: ', api);
 fetch(api).then(function (r) {
     r.json().then(function (j) {

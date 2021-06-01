@@ -1,8 +1,10 @@
 from django.contrib import admin
 from django import forms
+from django.urls import path
 from .models import Database, SourceTable, Reflection
 from django_ace import AceWidget
 from .methods import make_script
+from . import views
 
 
 class DatabaseForm(forms.ModelForm):
@@ -25,6 +27,13 @@ class DatabaseForm(forms.ModelForm):
 class DatabaseAdmin(admin.ModelAdmin):
     form = DatabaseForm
     list_display = ['handle', 'description', 'source']
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path('config', self.admin_site.admin_view(views.db_config))
+        ]
+        return custom_urls + urls
 
 
 class SourceTableForm(forms.ModelForm):
@@ -52,6 +61,16 @@ class SourceTableAdmin(admin.ModelAdmin):
     form = SourceTableForm
     list_display = ['__str__', 'description']
     ordering = ('source_database', 'source_table')
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                '<slug:dbIdOrHandle>/tables',
+                self.admin_site.admin_view(views.db_tables)
+            )
+        ]
+        return custom_urls + urls
 
 
 class ReflectionForm(forms.ModelForm):
@@ -127,6 +146,16 @@ class ReflectionAdmin(admin.ModelAdmin):
             ]
         else:
             return []
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom_urls = [
+            path(
+                '<slug:btID>/fields',
+                self.admin_site.admin_view(views.table_fields)
+            )
+        ]
+        return custom_urls + urls
 
 
 admin.site.register(Database, DatabaseAdmin)
