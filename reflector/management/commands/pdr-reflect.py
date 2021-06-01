@@ -28,12 +28,11 @@ class Command(BaseCommand):
         log = options['log']
         if isinstance(log, int):
             log = log * 10
-            print("Setting log level to ", log)
+            logging.info("Setting log level to {0}".format(log))
             logging.getLogger('root').setLevel(log)
         try:
             while True:
                 for reflection in Reflection.objects.all():
-                    print(reflection, ': ', reflection.reflect())
                     logging.info(
                         str(reflection)
                         + ': '
