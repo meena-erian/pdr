@@ -25,9 +25,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         interval = options['interval']
-        log = options['log'] * 10
-        if log:
-            print("Setting log lever to ", log)
+        log = options['log']
+        if isinstance(log, int):
+            log = log * 10
+            print("Setting log level to ", log)
             logging.getLogger('root').setLevel(log)
         try:
             while True:
