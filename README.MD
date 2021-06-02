@@ -94,19 +94,23 @@ urlpatterns = [
 4. Run `python manage.py makemigrations` and then `python manage.py migrate` to create django_pdr's data models.
 
 5. Start the development server and head over to the Django admin website. You will find that Django_pdr's data models has been added.
+
    ![Django PDR Models](docs/images/models.png)
 
 6. Start by adding all source and destination databases you wan to replicate data from/to. To add a database, first select the `Source` RDBMS type. Once you select any type, it will show a placeholder JSON connection `Config` edit this JSON code with the configuration of your database. And then fill in the rest of the form and save it.
+
    ![Adding Databases](docs/images/add_db.png)
 
 7. Once you add your databases, you can set any table from any database as a SourceTable. To define a table as a SourceTable, first select the database where the table exists, and Django_pdr will automatically list all tables in that database. Select one and save.
+
    ![Adding Source Tables](docs/images/add_source.png)
 
 8. Now that you have defined SourceTables, it's time to create Reflections. A Reflection defines how any changes in records in a source table should reflect in another table. Any SourceTable can have as many Reflections as you want, and Reflections are very flexible since they can reflect data into a whole new structure, in an entirely different database system, yet keep it up to date.
  The first step to add a reflection is by defining the SourceTable and then the destination database, and finally the destination table. Once you do so, it automatically generates default Reflection configuration represented in the `Destination Fields` JSON object and the `Reflection statement`. Initially, the `Destination Fields` JSON is the same as the `Source Fields` JSON. Which defines the columns of the table and the primary key. However, you can customize the JSON of the `Destination Fields` and the SQL `Reflection statement` to change which fields you want to be replicated and how exactly do you expect them to be replicated.
+ 
    ![Defining Reflections](docs/images/add_reflection.png)
 
-9. In another terminal window, run the command `python manage.py pdr-reflect -i 1` to start the PDR background activity. The pdr-reflect managment command checks if there are any pending changes in any source table if it finds any, it reflects them in to their destination Reflection or Reflections. the `-i` option is the interval in seconds, during which the server checks if there are any pending changes. Setting this interval to a small value can take more from the netwrok bandwidth in case of setting too many reflection. Setting it to a great value can result in a delay in replication, however, all changes will be reflected sooner or later.
+9. In another terminal window, run the command `python manage.py pdr-reflect -i 1` to start the PDR background activity. The pdr-reflect management command checks if there are any pending changes in any source table if it finds any, it reflects them into their destination Reflection or Reflections. the `-i` option is the interval in seconds, during which the server checks if there are any pending changes. Setting this interval to a small value can take more from the network bandwidth in case of setting too many reflections. Setting it to a great value can result in a delay in replication, however, all changes will be reflected sooner or later.
 
 
 <!-- ROADMAP -->
