@@ -230,7 +230,7 @@ class Database(models.Model):
                 'Loading meta data for {0} schema {1}'
                 .format(self, schema)
             )
-            cached_database_metas[metaid] = MetaData()
+            cached_database_metas[metaid] = MetaData(schema=schema)
             cached_database_metas[metaid].reflect(bind=db)
             return cached_database_metas[metaid]
 

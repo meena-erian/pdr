@@ -1,7 +1,10 @@
 from django.core.management.base import BaseCommand, CommandError
-from reflector.models import Reflection
+from django_pdr.models import Reflection
 import logging
 import time
+
+
+logging.basicConfig(level=logging.INFO)
 
 
 class Command(BaseCommand):
@@ -33,14 +36,15 @@ class Command(BaseCommand):
         try:
             while True:
                 for reflection in Reflection.objects.all():
-                    logging.info(
-                        str(reflection)
-                        + ': '
-                        + str(reflection.reflect())
-                    )
+                    if reflection.active:
+                        logging.info(
+                            str(reflection)
+                            + ': '
+                            + str(reflection.reflect())
+                        )
                 if interval:
                     time.sleep(interval)
                 else:
                     break
         except KeyboardInterrupt:
-            logging.info('Terminating PDR worker')
+            logging.warning('Terminating PDR worker')

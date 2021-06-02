@@ -3,12 +3,12 @@ def make_query(query_name, *args):
     A function used to generate SQL code from SQL templates
     saved in the SQL folder.
 
-    For more information see reflector/sql/README.MD
+    For more information see django_pdr/sql/README.MD
     """
     import os
-    import reflector
+    import django_pdr
     file_path = "{0}\\sql\\{1}.sql" \
-        .format(os.path.dirname(reflector.__file__), query_name)
+        .format(os.path.dirname(django_pdr.__file__), query_name)
     f = open(file_path)
     d = f.read()
     return d.format(*args)
@@ -30,12 +30,13 @@ def exec_query(engine, query_name, *args):
 def make_script(script_name, *args):
     """
     A function used to generate JavaScript code based on the JavaScript
-    templates in the js folder. For more information see reflector/js/README.MD
+    templates in the js folder. For more information see
+    django_pdr/js/README.MD
     """
     import os
-    import reflector
+    import django_pdr
     file_path = "{0}\\js\\{1}.js" \
-        .format(os.path.dirname(reflector.__file__), script_name)
+        .format(os.path.dirname(django_pdr.__file__), script_name)
     f = open(file_path)
     d = f.read()
     import re

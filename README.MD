@@ -2,25 +2,13 @@
 <!-- PROJECT LOGO -->
 <br />
 <p align="center">
-<!--<a href="https://github.com/meena-erian/pdr">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
-  </a>-->
 
-  <h3 align="center">Pantograph Database Replicator</h3>
+  <h3 align="center">PDR (Pantograph Database Replicator)</h3>
 
   <p align="center">
     Flexible Database replication system compatible with most SQL databases
     <br />
-    <!--
-    <a href=""><strong>Explore the docs »</strong></a>
-    <br />
-    <br />
-    <a href="">View Demo</a>
-    ·
-    <a href="/issues">Report Bug</a>
-    ·
-    <a href="/issues">Request Feature</a>
-    -->
+    <small>This README is intended to be viewd <a href='https://github.com/meena-erian/pdr'>on github </a>some links and updates might not reflect correctly in the PyPI website.</small>
   </p>
 </p>
 
@@ -39,13 +27,6 @@
     </li>
     <li>
       <a href="#quick-start">Quick Start</a>
-      <!--
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-      -->
     </li>
     <!--<li><a href="#usage">Usage</a></li>-->
     <li><a href="#roadmap">Roadmap</a></li>
@@ -61,8 +42,6 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-<!-- [![Product Name Screen Shot][product-screenshot]](https://example.com) -->
-
 PDR is a standalone Django app for establishing a reliable, high-performance, cross-platform, live mirror of any table[s] in an SQL database server to any other SQL database server. 
 <br />
 Pantograph database replication is event driven, not time driven, ie. it doesn’t update the whole mirror database periodically; Instead, it updates each individual group of affected records in the affected table in the mirror at the moment it's modified in the original database. Which results in a more speedy instant update, yet consumes less bandwidth and server resources.
@@ -74,8 +53,8 @@ A list of commonly used resources that I find helpful are listed in the acknowle
 
 1. Can replicate data to multiple tables in separate databases.
 2. Can replicate data into a new structure, yet, keep it live.
-3. Can replicate data from any kind of SQL database.
-4. Very reliable as pdr events are created by native SQL trigger functions inside source databases.
+3. Can be used with most RDBMS. Currently supports Microsoft SQL, PostgreSQL, MySQL, MariaSQL, SQLite, FirebirdSQL.
+4. Very reliable as PDR events are created by native SQL trigger functions inside source databases.
 5. High in performance as it’s event-driven.
 6. One-way data replication can be used to join data from multiple different tables in multiple different databases into one live table.
 7. Provides a simple easy to use GUI to configure replications.
@@ -89,15 +68,15 @@ The project is based on Django, the popular python framework, SQLAlchemy, A wond
 
 ## Quick start
 
-1. Run  `pip install django-pdr` to install Pantograph Database Replicator's python package from the python package index
+1. Run  `pip install django-pdr` to install django_pdr's python package from the python package index
 
-2. Add "reflector" and "django_ace" to your INSTALLED_APPS setting like this:
+2. Add "django_pdr" and "django_ace" to your INSTALLED_APPS setting like this:
 
 ```python
 INSTALLED_APPS = [
     ...
     'django_ace',
-    'reflector',
+    'django_pdr',
 ]
 ```
 
@@ -107,91 +86,27 @@ INSTALLED_APPS = [
 from django.contrib import admin
 
 urlpatterns = [
+    ...
     path('admin/', admin.site.urls),
 ]
 ```
 
-4. Run `python manage.py migrate` to create the reflector models.
+4. Run `python manage.py makemigrations` and then `python manage.py migrate` to create django_pdr's data models.
 
-5. Start the development server and visit http://127.0.0.1:8000/admin/
-   to setup Databases, SourceTables and then Reflections.
+5. Start the development server and head over to the Django admin website. You will find that Django_pdr's data models has been added.
+   ![Django PDR Models](docs/images/models.png)
 
-6. In another terminal window, run the command `python manage.py pdr-reflect -i 1` to start the PDR background activity
+6. Start by adding all source and destination databases you wan to replicate data from/to. To add a database, first select the `Source` RDBMS type. Once you select any type, it will show a placeholder JSON connection `Config` edit this JSON code with the configuration of your database. And then fill in the rest of the form and save it.
+   ![Adding Databases](docs/images/add_db.png)
 
-<!-- GETTING STARTED -->
-<!--
-## Getting Started
+7. Once you add your databases, you can set any table from any database as a SourceTable. To define a table as a SourceTable, first select the database where the table exists, and Django_pdr will automatically list all tables in that database. Select one and save.
+   ![Adding Source Tables](docs/images/add_source.png)
 
-In order to install and use Pantograph Database Replicator, first you have to determine a server that can access all source and destination databases. As you will install Pantograph databasae replicator on that server, or if you only want to try it, you can just create multiple SQLite files to use them as your example databases.
+8. Now that you have defined SourceTables, it's time to create Reflections. A Reflection defines how any changes in records in a source table should reflect in another table. Any SourceTable can have as many Reflections as you want, and Reflections are very flexible since they can reflect data into a whole new structure, in an entirely different database system, yet keep it up to date.
+ The first step to add a reflection is by defining the SourceTable and then the destination database, and finally the destination table. Once you do so, it automatically generates default Reflection configuration represented in the `Destination Fields` JSON object and the `Reflection statement`. Initially, the `Destination Fields` JSON is the same as the `Source Fields` JSON. Which defines the columns of the table and the primary key. However, you can customize the JSON of the `Destination Fields` and the SQL `Reflection statement` to change which fields you want to be replicated and how exactly do you expect them to be replicated.
+   ![Defining Reflections](docs/images/add_reflection.png)
 
-
-### Prerequisites
-
-Pantograph Database Replicator requires that you have Python 3 and pip installed, in addition to the following python modules.
-
-
-* Django python framework
-  ```sh
-  pip install django
-  ```
-* JavaScript based code-editor for Django
-  ```sh
-  pip install django-ace
-  ```
-* PostgreSQL database adapter
-  ```sh
-  pip install psycopg2
-  ```
-* For accurate timezone calculations
-  ```sh
-  pip install pytz
-  ```
-* SQL abstraction layer
-  ```sh
-  pip install SQLAlchemy
-  ```
-* For credentials encryption
-  ```sh
-  pip install django-pgcrypto
-  ```
-
-### Installation
-
-1. Clone the repo
-   ```sh
-   git clone https://github.com/meena-erian/pdr.git
-   ```
-2. Open a terminal in the cloned folder
-   ```sh
-   cd pdr
-   ```
-3. Create Pantograph Database Replicator's database
-   ```sh
-   python manage.py migrate
-   ```
-4. Collect static files
-   ```sh
-   python manage.py collectstatic
-   ```
-5. Set up superuser's login
-   ```sh
-   python manage.py createsuperuser
-   ```
-6. Run the server
-   ```sh
-   python manage.py runserver
-   ```
-7. In order to install the server permanently as an Apache service, (which would also alow you to run it over SSL) see ["How to use Django with Apache and mod_wsgi”](https://docs.djangoproject.com/en/3.1/howto/deployment/wsgi/modwsgi/)
-
-
-
-<!-- USAGE EXAMPLES 
-## Usage
-
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
-
-_For more examples, please refer to the [Documentation](https://example.com)_
--->
+9. In another terminal window, run the command `python manage.py pdr-reflect -i 1` to start the PDR background activity. The pdr-reflect managment command checks if there are any pending changes in any source table if it finds any, it reflects them in to their destination Reflection or Reflections. the `-i` option is the interval in seconds, during which the server checks if there are any pending changes. Setting this interval to a small value can take more from the netwrok bandwidth in case of setting too many reflection. Setting it to a great value can result in a delay in replication, however, all changes will be reflected sooner or later.
 
 
 <!-- ROADMAP -->

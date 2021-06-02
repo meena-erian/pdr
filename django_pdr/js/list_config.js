@@ -9,8 +9,8 @@
 var source = document.querySelector("#id_source");
 if (!source.value) return;
 /**
- * First, lets find the current relative base path of the reflector app
- *  based on the last index of '/reflector/ in the url.
+ * First, lets find the current relative base path of the django_pdr app
+ *  based on the last index of '/django_pdr/ in the url.
  */
 var pureBaseIndex = location.pathname.lastIndexOf('/database/');
 var pureBasePath = location.pathname.slice(0, pureBaseIndex);

@@ -1,6 +1,6 @@
 # JavaScript
 
-In this folder you can write JavaScript code to be used in the client side using the [method](/reflector/methods.py) ```make_script(file_name, *args)``` where you can as well insert arguments from the python runtime to the template JavaScript code. 
+In this folder you can write JavaScript code to be used in the client side using the [method](/django_pdr/methods.py) ```make_script(file_name, *args)``` where you can as well insert arguments from the python runtime to the template JavaScript code. 
 
 ## Example:
 If you have the file **hello.js** with the content:
