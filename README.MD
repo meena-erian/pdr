@@ -6,7 +6,7 @@
     <img src="images/logo.png" alt="Logo" width="80" height="80">
   </a>-->
 
-  <h3 align="center">Pantograph Database Replicator</h3>
+  <h3 align="center">PDR (Pantograph Database Replicator)</h3>
 
   <p align="center">
     Flexible Database replication system compatible with most SQL databases
@@ -91,13 +91,13 @@ The project is based on Django, the popular python framework, SQLAlchemy, A wond
 
 1. Run  `pip install django-pdr` to install Pantograph Database Replicator's python package from the python package index
 
-2. Add "reflector" and "django_ace" to your INSTALLED_APPS setting like this:
+2. Add "django_pdr" and "django_ace" to your INSTALLED_APPS setting like this:
 
 ```python
 INSTALLED_APPS = [
     ...
     'django_ace',
-    'reflector',
+    'django_pdr',
 ]
 ```
 
@@ -111,12 +111,12 @@ urlpatterns = [
 ]
 ```
 
-4. Run `python manage.py migrate` to create the reflector models.
+1. Run `python manage.py migrate` to create django_pdr's data models.
 
-5. Start the development server and visit http://127.0.0.1:8000/admin/
+2. Start the development server and visit http://127.0.0.1:8000/admin/
    to setup Databases, SourceTables and then Reflections.
 
-6. In another terminal window, run the command `python manage.py pdr-reflect -i 1` to start the PDR background activity
+3. In another terminal window, run the command `python manage.py pdr-reflect -i 1` to start the PDR background activity
 
 <!-- GETTING STARTED -->
 <!--

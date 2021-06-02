@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand, CommandError
-from reflector.models import Reflection
+from django_pdr.models import Reflection
 import logging
 import time
 

@@ -1,6 +1,6 @@
 from django.apps import AppConfig
 
 
-class ReflectorConfig(AppConfig):
+class DjangoPdrConfig(AppConfig):
     default_auto_field = 'django.db.models.AutoField'
-    name = 'reflector'
+    name = 'django_pdr'

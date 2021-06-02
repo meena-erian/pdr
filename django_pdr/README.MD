@@ -1,6 +1,6 @@
-# Reflector
+# django_pdr
 
-The reflector app is the main app of the Pantograph Database Replicator.
+The django_pdr app is the main app of the Pantograph Database Replicator.
  It contains all the computer instructions and models for handling 
  and managing the replication processes.
 
@@ -22,12 +22,12 @@ understaing how it works internally, Then this README file is where you should s
 
 ## Important items in this directory
 
-1. **[js](/reflector/js) folder:** This folder contains JavaScript templetes for adding some interactivity to the client side.
-2. **[sql](/reflector/sql) folder:** This folder contains SQL templates used to run advanced database commands that cannot be otherwise performed using SQLAlchemy.
-3. **[admin.py](/reflector/admin.py):** This file defines how users can manage PDR from the Django admin portal
-4. **[methods.py](/reflector/methods.py):** This file defines some functions for general use such as ```make_query``` and ```make_script``` which are used to load code templates from the folders [sql](/reflector/js) and [js](/reflector/js).
-5. **[models.py](/reflector/models.py):** This is basically the core of PDR. it defines not only all data models stored in the pdr server as the server settings but also all methods associated with each.
-6. **[views.py](/reflector/views.py):** This file defines server-side APIs used to perform some client-server communication.
+1. **[js](/django_pdr/js) folder:** This folder contains JavaScript templetes for adding some interactivity to the client side.
+2. **[sql](/django_pdr/sql) folder:** This folder contains SQL templates used to run advanced database commands that cannot be otherwise performed using SQLAlchemy.
+3. **[admin.py](/django_pdr/admin.py):** This file defines how users can manage PDR from the Django admin portal
+4. **[methods.py](/django_pdr/methods.py):** This file defines some functions for general use such as ```make_query``` and ```make_script``` which are used to load code templates from the folders [sql](/django_pdr/js) and [js](/django_pdr/js).
+5. **[models.py](/django_pdr/models.py):** This is basically the core of PDR. it defines not only all data models stored in the pdr server as the server settings but also all methods associated with each.
+6. **[views.py](/django_pdr/views.py):** This file defines server-side APIs used to perform some client-server communication.
 
 <br />
 <br />
