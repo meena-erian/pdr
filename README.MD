@@ -11,6 +11,7 @@
   <p align="center">
     Flexible Database replication system compatible with most SQL databases
     <br />
+    <small>This README is intended to be viewd <a href='https://github.com/meena-erian/pdr'>on github </a>some links and updates might not reflect correctly in the PyPI website.</small>
     <!--
     <a href=""><strong>Explore the docs »</strong></a>
     <br />
@@ -89,7 +90,7 @@ The project is based on Django, the popular python framework, SQLAlchemy, A wond
 
 ## Quick start
 
-1. Run  `pip install django-pdr` to install Pantograph Database Replicator's python package from the python package index
+1. Run  `pip install django-pdr` to install django_pdr's python package from the python package index
 
 2. Add "django_pdr" and "django_ace" to your INSTALLED_APPS setting like this:
 
@@ -107,11 +108,12 @@ INSTALLED_APPS = [
 from django.contrib import admin
 
 urlpatterns = [
+    ...
     path('admin/', admin.site.urls),
 ]
 ```
 
-1. Run `python manage.py migrate` to create django_pdr's data models.
+1. Run `python manage.py makemigrations` and then `python manage.py migrate` to create django_pdr's data models.
 
 2. Start the development server and visit http://127.0.0.1:8000/admin/
    to setup Databases, SourceTables and then Reflections.
