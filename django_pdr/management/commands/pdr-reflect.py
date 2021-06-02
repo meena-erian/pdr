@@ -4,6 +4,9 @@ import logging
 import time
 
 
+logging.basicConfig(level=logging.INFO)
+
+
 class Command(BaseCommand):
     help = 'Update all destincation database by any '\
         'pending changes in source tables'
@@ -33,14 +36,15 @@ class Command(BaseCommand):
         try:
             while True:
                 for reflection in Reflection.objects.all():
-                    logging.info(
-                        str(reflection)
-                        + ': '
-                        + str(reflection.reflect())
-                    )
+                    if reflection.active:
+                        logging.info(
+                            str(reflection)
+                            + ': '
+                            + str(reflection.reflect())
+                        )
                 if interval:
                     time.sleep(interval)
                 else:
                     break
         except KeyboardInterrupt:
-            logging.info('Terminating PDR worker')
+            logging.warning('Terminating PDR worker')
