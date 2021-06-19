@@ -2,6 +2,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django_pdr.models import Reflection
 import logging
 import time
+import traceback
 
 
 logging.basicConfig(level=logging.INFO)
@@ -37,11 +38,14 @@ class Command(BaseCommand):
             while True:
                 for reflection in Reflection.objects.all():
                     if reflection.active:
-                        logging.info(
-                            str(reflection)
-                            + ': '
-                            + str(reflection.reflect())
-                        )
+                        try:
+                            logging.info(
+                                str(reflection)
+                                + ': '
+                                + str(reflection.reflect())
+                            )
+                        except Exception as e:
+                            traceback.print_exc()
                 if interval:
                     time.sleep(interval)
                 else:
