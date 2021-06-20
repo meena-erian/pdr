@@ -97,7 +97,7 @@ urlpatterns = [
 
    ![Django PDR Models](docs/images/models.png)
 
-6. Start by adding all source and destination databases you wan to replicate data from/to. To add a database, first select the `Source` RDBMS type. Once you select any type, it will show a placeholder JSON connection `Config` edit this JSON code with the configuration of your database. And then fill in the rest of the form and save it.
+6. Start by adding all source and destination databases you want to replicate data from/to. To add a database, first select the `Source` RDBMS type. Once you select any type, it will show a placeholder JSON connection `Config` edit this JSON code with the configuration of your database. And then fill in the rest of the form and save it.
 
    ![Adding Databases](docs/images/add_db.png)
 
