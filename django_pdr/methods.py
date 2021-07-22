@@ -7,8 +7,11 @@ def make_query(query_name, *args):
     """
     import os
     import django_pdr
-    file_path = "{0}\\sql\\{1}.sql" \
-        .format(os.path.dirname(django_pdr.__file__), query_name)
+    file_path = os.path.join(
+        os.path.dirname(django_pdr.__file__),
+        "sql",
+        query_name + ".sql"
+    )
     f = open(file_path)
     d = f.read()
     return d.format(*args)
@@ -35,8 +38,11 @@ def make_script(script_name, *args):
     """
     import os
     import django_pdr
-    file_path = "{0}\\js\\{1}.js" \
-        .format(os.path.dirname(django_pdr.__file__), script_name)
+    file_path = os.path.join(
+        os.path.dirname(django_pdr.__file__),
+        "js",
+        script_name + ".js"
+    )
     f = open(file_path)
     d = f.read()
     import re
