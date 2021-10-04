@@ -20,17 +20,22 @@ database_engines = {}
 
 
 def get_table_key(table, obj=False):
-    """
-    This function takes an SQLAlchemy table object and returns its
+    """This function takes an SQLAlchemy table object and returns its
     primary key, or if the table has no primary key, it returns its
     first foreign key. Otherwise, it raises a ValidationError
 
-    @param table: An SQLAlchemy table object
-    @param obj: boolean, of whether the function is expected to return
-     an SQLAlchemy Column object. Otherwise, it returns a string, the
-     column name.
-    @return: Returns either the SQLAlchemy Column object or the
-    column name of the key column of the provided table.
+    Args:
+        table (SQLAlchemy.Table): An SQLAlchemy table object
+        obj (bool, optional): Whether the function is expected to return
+            an SQLAlchemy Column object. Otherwise, it returns a string, the
+            column name. Defaults to False.
+
+    Raises:
+        ValidationError: When the table has no key columns.
+
+    Returns:
+        (SQLAlchemy.Column|str): Returns either the SQLAlchemy Column object or the
+        column name of the key column of the provided table.
     """
     primary_key_columns = table.primary_key.columns.values()
     if len(primary_key_columns):
@@ -41,7 +46,7 @@ def get_table_key(table, obj=False):
             key = foreign_keys[0].column
         else:
             raise ValidationError(
-                'Table {0} has primary key or even foreign key'
+                'Table {0} has no primary key or even foreign key'
                 .format(table)
             )
     if obj:
@@ -50,14 +55,13 @@ def get_table_key(table, obj=False):
 
 
 def add_column(engine, table_name, column):
-    """
-    This function is used to add a new field to an already
+    """This function is used to add a new field to an already
     existing table in a database.
 
-    @param engine SQLAlchemy database engine object
-    @param table_name str, full path.name of the target table
-    @param column SQLAlchemy Column object that will be added
-    @returns No return value
+    Args:
+        engine (SQLAlchemy.Engine): Database engine object
+        table_name (str): full dottedpath.name of the target table
+        column (SQLAlchemy.Column): Column object that will be added
     """
     column_name = column.compile(dialect=engine.dialect)
     column_type = column.type.compile(engine.dialect)
@@ -71,12 +75,14 @@ def add_column(engine, table_name, column):
 
 
 def typeFullName(o):
-    """
-    This function takes any user defined object or class of any type and
+    """This function takes any user defined object or class of any type and
     returns a string absolute identifier of the provided type.
 
-    @param o: object of any type to be inspected
-    @returns: str The full path of the provided type
+    Args:
+        o (Any): object of any type to be inspected
+
+    Returns:
+        str: The full dotted path of the provided type
     """
     module = o.__class__.__module__
     if module is None or module == str.__class__.__module__:
@@ -106,14 +112,16 @@ def ColTypeToStr(Type):
 
 
 def StrToColType(TypePath):
-    """
-    This function takes a string SQLAlchemy Column type identifier
+    """This function takes a string SQLAlchemy Column type identifier
     and returns an SQLAlchemy type definition class of the provided type.
 
     This function is the inverse of the function ColTypeToStr.
 
-    @param TypePath: str, The string identifier of an SQLAlchemy column type.
-    @returns: class, the SQLAlchemy column class of the provided string.
+    Args:
+        TypePath (str): The string identifier of an SQLAlchemy column type.
+
+    Returns:
+        class: the SQLAlchemy column class of the provided string
     """
     import sqlalchemy
     pathentries = TypePath.split('.')
@@ -338,7 +346,7 @@ class SourceTable(models.Model):
 
             refresh (boolean): Whether to load the table structure from the
                 database or to use cached meta data instead for performance.
-        
+
         Returns
         -------
             Class(SQLAlchemy.Table)
