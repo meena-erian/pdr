@@ -210,7 +210,7 @@ class Database(models.Model):
                 results.append(record[0])
             return results
 
-    def meta(self, schema=None):
+    def meta(self, schema=None, refresh=False):
         """
         This function returns an SQLAlchemy database MetaData object of the
          database from which the function is being called.
@@ -220,10 +220,18 @@ class Database(models.Model):
          that when it's called again for the same database, it will first
          look in the dictionary and if it found that the MetaDate is already
          saved there, it will return it directly from there.
+
+        Parameters
+        ----------
+            schema (str | None): The schema name to get the MetaData for.
+                Default is 'public'
+
+            refresh (boolean): Whether to reload the MetaData from the
+                server or use the cached copy instead for performance.
         """
         db = self.mount()
         metaid = '{0}.{1}'.format(self.pk, schema)
-        if metaid in cached_database_metas:
+        if metaid in cached_database_metas and not refresh:
             return cached_database_metas[metaid]
         else:
             logging.debug(
@@ -234,12 +242,23 @@ class Database(models.Model):
             cached_database_metas[metaid].reflect(bind=db)
             return cached_database_metas[metaid]
 
-    def get_table(self, table, schema=None):
+    def get_table(self, table, schema=None, refresh=False):
         """
         This function returns an SQLAlchemy Table object for the table
          identified by 'table', and 'schema' (optional)
+
+        Parameters
+        ----------
+            table (str): The name of the table to retrive
+
+            schema (str | None): The schema containing the intended table.
+                Default is None, which refers to the public schema.
+
+            refresh (boolean): Whether to load the table structure from the
+                database or to use the cached meta data instead
+                for performance.
         """
-        meta = self.meta(schema)
+        meta = self.meta(schema, refresh=refresh)
         if(len(meta.tables.keys()) < 1):
             raise Exception(
                 'Exception in function Database.get_table. '
@@ -280,14 +299,24 @@ class SourceTable(models.Model):
     source_table = models.CharField(max_length=200)
     description = models.CharField(max_length=500, blank=True)
 
-    def get_table(self):
+    def get_table(self, refresh=False):
         """
         Retrives the SQLAlchemy Table object of the source table from which
          the function was called.
+
+        Parameters
+        ----------
+
+            refresh (boolean): Whether to load the table structure from the
+                database or to use cached meta data instead for performance.
+
+        Returns
+        -------
+            Class(SQLAlchemy.Table)
         """
         path = self.source_table.split('.')
         path.reverse()
-        ret = self.source_database.get_table(*path)
+        ret = self.source_database.get_table(*path, refresh=refresh)
         if type(ret).__name__ != 'Table':
             raise Exception(
                 'Exception in function SourceTabl.get_table. '
@@ -299,24 +328,44 @@ class SourceTable(models.Model):
             )
         return ret
 
-    def get_pdr_table(self):
+    def get_pdr_table(self, refresh=False):
         """
         Retrives the notification channel Table object (AKA pdr_table) of the
          source table from which the function was called.
+
+        Parameters
+        ----------
+
+            refresh (boolean): Whether to load the table structure from the
+                database or to use cached meta data instead for performance.
+        
+        Returns
+        -------
+            Class(SQLAlchemy.Table)
         """
         table_path = self.source_table.split('.')
         if len(table_path) == 1:
             table_path.insert(0, 'None')
         pdr_table_name = '{0}_o_{1}_o_{2}'.format(pdr_prefix, *table_path)
-        return self.source_database.get_table(pdr_table_name)
+        return self.source_database.get_table(pdr_table_name, refresh=refresh)
 
-    def get_structure(self):
+    def get_structure(self, refresh=False):
         """
         Retrives a dict object describing the structure of the source table
          from which the function was called.
+
+        Parameters
+        ----------
+
+            refresh (boolean): Whether to load the table structure from the
+                database or to use cached meta data instead for performance.
+
+        Returns
+        -------
+            dict:
         """
         ret = {"columns": {}}
-        table = self.get_table()
+        table = self.get_table(refresh=refresh)
         if type(table).__name__ != 'Table':
             raise Exception(
                 'Exceeption in function SourceTable. get_structure.'
@@ -494,15 +543,26 @@ class Reflection(models.Model):
         max_length=10000
     )
 
-    def get_destination_table(self):
+    def get_destination_table(self, refresh=False):
+        """
+        Parameters
+        ----------
+
+            refresh (boolean): Whether to load the table structure from the
+                database or to use cached meta data instead for performance.
+
+        Returns
+        -------
+            Class(SQLAlchemy.Table)
+        """
         dest_table_path = self.destination_table.split('.')
         dest_table_path.reverse()
         destination_table = self.destination_database.get_table(
-            *dest_table_path)
+            *dest_table_path, refresh=refresh)
         return destination_table
 
-    def get_source_table(self):
-        return self.source_table.get_table()
+    def get_source_table(self, refresh=False):
+        return self.source_table.get_table(refresh=refresh)
 
     def get_destination_structure(self):
         return json.loads(self.destination_fields)
@@ -800,7 +860,11 @@ class Reflection(models.Model):
             raise ValidationError(
                 'Unable to parse json: {0}'.format(self.destination_fields))
         ddb = self.destination_database.mount()
-        destinationTable = self.destination_database.get_table(table, schema)
+        destinationTable = self.destination_database.get_table(
+            table,
+            schema,
+            refresh=True
+        )
         if destinationTable is not None:
             # Table already exists, check its compatiblity
             logging.info(
