@@ -34,8 +34,8 @@ def get_table_key(table, obj=False):
         ValidationError: When the table has no key columns.
 
     Returns:
-        (SQLAlchemy.Column|str): Returns either the SQLAlchemy Column object or the
-        column name of the key column of the provided table.
+        (SQLAlchemy.Column|str): Returns either the SQLAlchemy Column object
+        or the column name of the key column of the provided table.
     """
     primary_key_columns = table.primary_key.columns.values()
     if len(primary_key_columns):
@@ -169,7 +169,7 @@ class Database(models.Model):
         This function returns an instance of an SQLAlchemy database_engine of
          the database configured in the object calling the method.
 
-        For perfomance, each time this function is called, it saved a copy of
+        For perfomance, each time this function is called, it saves a copy of
          the engine in the database_engines dictionary so that when it's called
          again for the same database, it will first look in the dictionary and
          if it find that the engine is already saved there, it will return it
@@ -211,7 +211,7 @@ class Database(models.Model):
             results = []
             if self.source == datasources.SQLIGHT:
                 ret = connection.execute(make_query(datasources.__list__[
-                                    self.source]['dialect'] + '/list_tables'))
+                    self.source]['dialect'] + '/list_tables'))
             else:
                 ret = connection.execute(make_query('list_tables'))
             for record in ret:
@@ -282,7 +282,7 @@ class Database(models.Model):
 
     def clean(self):
         """
-        This function is used to calidate database connection information
+        This function is used to validate database connection information
          before saving it.
         """
         try:
@@ -302,6 +302,16 @@ class SourceTable(models.Model):
      can be added as a SourceTable. Once added, it's being monitored by the
      PDR server; so that whenever any changes occur in any record in that
      table, the PDR server will be notifed in order to update reflections.
+
+    When a talbe is added as a source table, trigger function are installed
+    inside the database intself, so that whenever any INSERT, UPDATE, or DELETE
+    events occure on any record in that table, the functions insert a record to
+    a pdr_event table inside the same database which is being used to record
+    the history of changes of that table. Each record in the pdr_event table
+    records what event has occured, (INSERT UPDATE OR DELETE) the timestamp
+    at which the event has occured, and the record affected is being identified
+    by the value of its primary key column. That's why source tables must have
+    a primary key column for a reliable way to refer to each individual record.
     """
     source_database = models.ForeignKey(Database, on_delete=models.CASCADE)
     source_table = models.CharField(max_length=200)
@@ -497,6 +507,75 @@ class SourceTable(models.Model):
 
 
 class Reflection(models.Model):
+    """A Reflection is a group of configurations and instructions that
+    describe a replication of a table. Minimally, a reflection describes
+    the destination database and the destination table to which data will
+    be replicated and the source table from which data will be retrived.
+    And by default, the destination table will have the same columes as
+    the source table from which it's being replicated. However, PDR provdes
+    more advanced option to customize the structure of the destination table
+    which keeping it up-to-date with its source table.
+
+    A reflection is described by the following three strings:
+        source_fields:
+            This field describes the structure of the source table (a list of
+            column names and data types and defines which column is the
+            primarykey)
+            source_fields are auto generated from the source database and
+            cannot be modified
+
+        destination_table:
+            The name of the destination table. (it will be created if it
+            didn't exist)
+
+        destination_fields:
+            This field descibes the structure of the destination table and it's
+            being used to create the table if it did not exist or to add
+            columns to it if it already existed but didn't contain all the
+            columns listed in the destination_table
+
+            Note: The table can contain more columns than that listed in
+                destination_fields. However, it must have the same primary
+                key as configured in the destination_fields variable.
+
+            key_binding: In addition to the columns, and the primary key,
+                there's a key_binding optional variable defined in the
+                destination_fields object. The syntax for this variable is:
+                { source_key : destination_key }
+                By default, source_key will be the name of the primary key
+                column name of the source table, and destination_key will be
+                the name of the primary key column name of the destination
+                table. However, if the column intended to be the primary key
+                for the destination table is not the same as that of the
+                source table, we might have some trouble applying the
+                replication because PDR needs to be able to identify each
+                idividual record in the destination table and match it with
+                the record it came from in the source table. That's why
+                key_binding must be used when the source and destination
+                talbes has different primary key columns.
+
+                Conditions:
+                ----------
+                The following conditions must be met when using key_binding
+
+                    1. Both of the source_key and the destination_key must be
+                        of the same data type.
+                    2. destination_key must be the only required field in the
+                        destination table because during replication, the
+                        PDR server while chech which records exist and which
+                        doesn't based on the value of that column and will
+                        create non-existing records by inserting nothing but
+                        the destination_key field for these records.
+                        Tl;Dr: destination_key must be the primary key of the
+                        destination table.
+
+        reflection_statment:
+            reflection_statment is an SQL update statment applied on every
+        record in the destination table to reflect the changes on that table.
+        The reflection statment is manipulated using SQLALchemy's bindparams
+        function with the values of each column in source_fields before
+        sending the query to the server.
+    """
     description = models.CharField(max_length=500)
     source_table = models.ForeignKey(  # The source table
         SourceTable,
