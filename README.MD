@@ -143,7 +143,7 @@ Distributed under the Apache 2 License. See `LICENSE` for more information.
 <!-- CONTACT -->
 ## Contact
 
-Meena (Menas) Erian - menas@portacode.com
+Meena (Menas) Erian - hi@menas.pro
 
 Project Link: [https://github.com/meena-erian/pdr](https://github.com/meena-erian/pdr)
 
