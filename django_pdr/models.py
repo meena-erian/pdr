@@ -267,12 +267,6 @@ class Database(models.Model):
                 for performance.
         """
         meta = self.meta(schema, refresh=refresh)
-        if(len(meta.tables.keys()) < 1):
-            raise Exception(
-                'Exception in function Database.get_table. '
-                '{0}.meta() returned an empty structure'
-                .format(self)
-            )
         if schema is not None:
             table = schema + '.' + table
         if table in meta.tables:
