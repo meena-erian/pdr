@@ -19,6 +19,17 @@ database_engines = {}
 # logging.basicConfig(level=logging.DEBUG)
 
 
+def remove_nulls_from_dict_values(d):
+    for k in d:
+        if type(d[k]) == str:
+            d[k] = d[k].replace('\0', '')
+    return d
+
+
+def remove_nulls_from_dict_list(lo):
+    return list(map(remove_nulls_from_dict_values, lo))
+
+
 def get_table_key(table, obj=False):
     """This function takes an SQLAlchemy table object and returns its
     primary key, or if the table has no primary key, it returns its
@@ -787,7 +798,7 @@ class Reflection(models.Model):
                 with destination_db_engine.connect() as destination_dbc:
                     destination_dbc.execute(
                         text(self.reflection_statment),
-                        selected_items
+                        remove_nulls_from_dict_list(selected_items)
                     )
                 start += limit
         logging.debug('Done Saving'.format(self))
