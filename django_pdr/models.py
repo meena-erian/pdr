@@ -675,10 +675,11 @@ class Reflection(models.Model):
         return source_table.c[source_key_name]
 
     def bulk_upsert(self, lst):
-        logging.debug(
+        logging.info(
             '{0} Saving {1} items'
             .format(self, len(lst))
         )
+        logging.info(lst)
         destination_db_engine = self.destination_database.mount()
         logging.debug('{0} retriving destination table'.format(self))
         destination_table = self.get_destination_table()
@@ -756,7 +757,7 @@ class Reflection(models.Model):
         for rec in targer_ids:
             if rec not in index_of_already_existing_records:
                 missing_records.append(rec)
-        logging.debug(
+        logging.info(
             '{0} {1} missing records were identified'
             .format(self, len(missing_records))
         )
@@ -767,7 +768,7 @@ class Reflection(models.Model):
             insert_data = [{destination_table_key.name: item}
                            for item in missing_records]
         if len(missing_records) > 0:
-            logging.debug(
+            logging.info(
                 '{0} Creating {1} missing records'
                 .format(self, len(missing_records))
             )
@@ -783,14 +784,14 @@ class Reflection(models.Model):
             )
         # run update statments for each record
         if len(lst) > 0:
-            logging.debug(
+            logging.info(
                 '{0} Updating data for {1} records'
                 .format(self, len(lst))
             )
             limit = 500
             start = 0
             while start < len(lst):
-                logging.debug(
+                logging.info(
                     '{0} Updating records from {1}, to {2}'
                     .format(self, start, start+limit)
                 )
@@ -804,10 +805,11 @@ class Reflection(models.Model):
         logging.debug('Done Saving'.format(self))
 
     def bulk_delete(self, lst):
-        logging.debug(
+        logging.info(
             '{0} Deleting {1} items'
             .format(self, len(lst))
         )
+        logging.info(lst)
         destination_table = self.get_destination_table()
         destination_table_key = get_table_key(destination_table, obj=True)
         targer_ids = lst
@@ -911,7 +913,7 @@ class Reflection(models.Model):
             self.bulk_upsert(upserts)
         if len(deletes) > 0:
             if self.ignore_delete_events:
-                logging.debug(
+                logging.info(
                     '{0} Ignoring {1} delete events'
                     .format(self, len(deletes))
                 )

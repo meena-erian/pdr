@@ -39,11 +39,13 @@ class Command(BaseCommand):
                 for reflection in Reflection.objects.all():
                     if reflection.active:
                         try:
-                            logging.info(
-                                str(reflection)
-                                + ': '
-                                + str(reflection.reflect())
-                            )
+                            ret = reflection.reflect()
+                            if ret:
+                                logging.info(
+                                    str(reflection)
+                                    + ': '
+                                    + str(ret)
+                                )
                         except Exception as e:
                             traceback.print_exc()
                 if interval:
