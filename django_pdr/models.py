@@ -868,30 +868,37 @@ class Reflection(models.Model):
         )
         pdr_table = self.source_table.get_pdr_table()
         data_table = self.source_table.get_table()
-        data_table_key = get_table_key(data_table, obj=True)
-        upsert_stmt = pdr_table.select().with_only_columns([
+        pdr_stmt = pdr_table.select().with_only_columns([
             func.max(pdr_table.c.id).label('{0}_id'.format(pdr_prefix)),
-            func.max(pdr_table.c.c_action).label(
-                '{0}_c_action'.format(pdr_prefix)),
             pdr_table.c.c_record.label('{0}_c_record'.format(pdr_prefix)),
             func.max(pdr_table.c.c_time).label('{0}_c_time'.format(pdr_prefix))
         ])
         if self.last_commit:
-            upsert_stmt = upsert_stmt.where(pdr_table.c.id > self.last_commit)
-        upsert_stmt = upsert_stmt.group_by(pdr_table.c.c_record)
-        upsert_stmt = upsert_stmt.order_by('{0}_id'.format(pdr_prefix))
-        upsert_stmt = alias(upsert_stmt, 'pdr')
-        upsert_stmt = upsert_stmt.join(
+            pdr_stmt = pdr_stmt.where(pdr_table.c.id > self.last_commit)
+
+        pdr_stmt = pdr_stmt.group_by(pdr_table.c.c_record).order_by(
+            '{0}_id'.format(pdr_prefix))
+        subq_alias = 'pdr'
+        pdr_stmt = alias(pdr_stmt, subq_alias)
+        final_stmt = pdr_stmt.join(
             data_table,
-            upsert_stmt.c['{0}_c_record'.format(pdr_prefix)]
-            == self.get_source_key()
+            pdr_stmt.c['{0}_c_record'.format(pdr_prefix)]
+            == self.get_source_key(),
+            isouter=True
+        ).join(
+            pdr_table,
+            pdr_stmt.c['{0}_id'.format(pdr_prefix)] == pdr_table.c.id
         )
-        upsert_stmt = select([upsert_stmt])
+        final_stmt = select([final_stmt]).with_only_columns([
+            pdr_stmt,
+            pdr_table.c.c_action.label('{0}_c_action'.format(pdr_prefix)),
+            data_table
+        ], maintain_column_froms=True)
         with self.source_table.source_database.mount().connect() as source_dbc:
-            ret = source_dbc.execute(upsert_stmt)
+            ret = source_dbc.execute(final_stmt)
             commits = [dict(commit) for commit in ret.fetchall()]
 
-        def retrive_data_record(commit):
+        def remove_pdr_columns(commit):
             data_record = commit.copy()
             data_record.pop('{0}_id'.format(pdr_prefix))
             data_record.pop('{0}_c_action'.format(pdr_prefix))
@@ -900,7 +907,7 @@ class Reflection(models.Model):
             return data_record
 
         upserts = [
-            retrive_data_record(commit) for commit in commits
+            remove_pdr_columns(commit) for commit in commits
             if commit[
                 '{0}_c_action'.format(pdr_prefix)
             ] in ['INSERT', 'UPDATE']
