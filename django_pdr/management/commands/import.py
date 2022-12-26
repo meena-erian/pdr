@@ -27,7 +27,7 @@ class Command(BaseCommand):
             logging.info("Setting log level to {0}".format(log))
             logging.getLogger('root').setLevel(log)
         pwd = os.getcwd()
-        pwd = os.join(pwd, 'exported_pdr_data')
+        pwd = os.path.join(pwd, 'exported_pdr_data')
         databases = os.listdir(os.path.join(pwd, "databases"))
         # os.path.isdir(os.path.join(pwd, "databases"))
         for db_handle in databases:
@@ -53,7 +53,7 @@ class Command(BaseCommand):
                 source_meta = json.load(file)
             source = SourceTable(
                 pk=int(pk),
-                source_database=source_meta["database"],
+                source_database_id=int(source_meta["database"]),
                 source_table=source_meta["table"],
                 description=source_meta["description"]
             )
@@ -86,8 +86,9 @@ class Command(BaseCommand):
             reflection = Reflection(
                 pk=int(pk),
                 description=reflection_meta["description"],
-                source_table=reflection_meta["source_table"],
-                destination_database=reflection_meta["destination_database"],
+                source_table_id=int(reflection_meta["source_table"]),
+                destination_database_id=int(
+                    reflection_meta["destination_database"]),
                 destination_table=reflection_meta["destination_table"],
                 last_commit=reflection_meta["last_commit"],
                 # last_updated=reflection_meta["last_updated"],

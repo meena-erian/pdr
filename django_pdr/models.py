@@ -830,7 +830,7 @@ class Reflection(models.Model):
     def dump(self):
         with self.source_table.source_database.mount().connect() as source_dbc:
             source_table = self.get_source_table()
-            source_pdr_table = self.source_table.get_pdr_table()
+            source_pdr_table = self.source_table.get_pdr_table(True)
             # Check if we have any pdr events for this source and
             # update "last_commit"
             ret = source_dbc.execute(
