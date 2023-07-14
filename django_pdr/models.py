@@ -4,9 +4,11 @@ from django.core.exceptions import ValidationError
 from datetime import datetime
 from sqlalchemy import *
 from sqlalchemy.orm import *
+from sqlalchemy.exc import OperationalError, InvalidRequestError
 from .datasources import datasources
 import urllib.parse
 import json
+import time
 import pytz
 import pgcrypto
 import logging
@@ -175,21 +177,7 @@ class Database(models.Model):
     def configs():
         return datasources.__list__
 
-    def mount(self):
-        """
-        This function returns an instance of an SQLAlchemy database_engine of
-         the database configured in the object calling the method.
-
-        For perfomance, each time this function is called, it saves a copy of
-         the engine in the database_engines dictionary so that when it's called
-         again for the same database, it will first look in the dictionary and
-         if it find that the engine is already saved there, it will return it
-
-        """
-        if str(self.pk) in database_engines:
-            # Run garbage collector to dispose old IDLE connections
-            # database_engines[str(self.pk)].dispose()
-            return database_engines[str(self.pk)]
+    def get_connection_str(self):
         config = json.loads(self.config)
         connectionStr = datasources.__list__[self.source]['dialect'] + '://'
         if 'dbfile' in config:
@@ -206,6 +194,39 @@ class Database(models.Model):
                 connectionStr += ":"
                 connectionStr += str(config["port"])
             connectionStr += "/" + config["dbname"]
+        return connectionStr
+
+    def mount(self, max_attempts=5, sleep_interval=10):
+        """
+        This function returns an instance of an SQLAlchemy database_engine of
+        the database configured in the object calling the method.
+
+        For performance, each time this function is called, it saves a copy of
+        the engine in the database_engines dictionary so that when it's called
+        again for the same database, it will first look in the dictionary and
+        if it finds that the engine is already saved there, it will return it.
+
+        If the engine is not connected, it will try to reconnect a number of
+        times defined by max_attempts, with a sleep interval between each
+        attempt defined by sleep_interval. If it cannot connect after
+        max_attempts times, it will raise an error.
+        """
+        if str(self.pk) in database_engines:
+            # Try to connect if engine is cached
+            for attempt in range(max_attempts):
+                try:
+                    # Execute a simple statement to check the connection
+                    with database_engines[str(self.pk)].connect() as conn:
+                        result = conn.execute(text("SELECT 1"))
+                    return database_engines[str(self.pk)]
+                except (OperationalError, InvalidRequestError):
+                    # If connection failed, sleep for a while and then retry
+                    time.sleep(sleep_interval)
+            # If connection failed after max_attempts, raise an error
+            msg = (f"Could not connect to database {self} after "
+                   f"{max_attempts} attempts.")
+            raise OperationalError(msg)
+        connectionStr = self.get_connection_str()
         database_engines[str(self.pk)] = create_engine(
             connectionStr,
             echo=False
